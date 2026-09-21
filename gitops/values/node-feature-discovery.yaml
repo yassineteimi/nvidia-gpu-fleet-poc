@@ -1,0 +1,72 @@
+# Values for Node Feature Discovery, chart 0.19.0.
+#
+# These are not arbitrary. Deploying NFD separately from the GPU Operator means
+# taking on the configuration the operator's NFD subchart would have applied,
+# and the operator's node selectors stop matching if any of it is left out.
+# Three settings in particular:
+#
+#   deviceLabelFields: [vendor]
+#     NFD's own default is [class, vendor], which produces
+#     feature.node.kubernetes.io/pci-0300_10de.present. Every GPU Operator
+#     component selects on feature.node.kubernetes.io/pci-10de.present. Without
+#     this line the labels exist, they just are not the labels anything is
+#     looking for, and the operator sits there with nothing scheduled and
+#     nothing obviously wrong.
+#
+#   deviceClassWhitelist
+#     0300 and 0302 are the display and 3D controller classes an NVIDIA GPU
+#     reports under. The 02 entries come from the operator's own list and cover
+#     the network devices its RDMA and GPUDirect paths look for.
+#
+#   extraLabelNs: [nvidia.com]
+#     GPU Feature Discovery, which ships inside the GPU Operator, publishes
+#     labels in the nvidia.com namespace. NFD's master refuses namespaces it has
+#     not been told about, so GPU model, driver version and CUDA capability
+#     labels never appear without this.
+
+priorityClassName: system-node-critical
+
+master:
+  replicaCount: 1
+  config:
+    # Required for the nvidia.com labels published by GPU Feature Discovery.
+    extraLabelNs:
+      - nvidia.com
+
+worker:
+  tolerations:
+    # The control plane is untainted on this single node cluster, so the first
+    # toleration is belt and braces. The second matters: once a GPU node is
+    # tainted, nfd-worker still has to run on it, because the labels that tell
+    # the rest of the platform it is a GPU node come from there.
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+  config:
+    core:
+      sleepInterval: 60s
+    sources:
+      pci:
+        deviceClassWhitelist:
+          - "02"
+          - "0200"
+          - "0207"
+          - "0300"
+          - "0302"
+        deviceLabelFields:
+          - vendor
+
+gc:
+  enable: true
+  replicaCount: 1
+
+# The topology updater feeds NUMA aware scheduling across many sockets. One L4
+# in one node has nothing useful to say about NUMA. Off is already the chart
+# default; it is written out so that a future chart bump changing that default
+# does not quietly add a DaemonSet to every node.
+topologyUpdater:
+  enable: false

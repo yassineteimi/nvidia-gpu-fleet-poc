@@ -1,0 +1,67 @@
+# Values for the NVIDIA GPU Operator, chart v26.7.0.
+#
+# The two version strings below are the reason this repository exists. They are
+# the driver and the container toolkit on every GPU node in the cluster. Upgrade
+# by editing them and committing. Roll back by reverting the commit. At no point
+# does anyone log in to a node and run a package manager.
+#
+# They are written as literals rather than left to the chart defaults so that
+# the version in Git is the version on the node, and a chart bump cannot move
+# the driver underneath the fleet as a side effect.
+
+# NFD is a separate Application in sync wave 0. See gitops/apps/node-feature-discovery.yaml.
+nfd:
+  enabled: false
+
+driver:
+  enabled: true
+  # Chart v26.7.0 default. Pinned here so it stays that way across chart bumps.
+  repository: nvcr.io/nvidia
+  image: driver
+  version: "595.91.07"
+
+  # Precompiled driver packages are still a tech preview and only for some
+  # Ubuntu 22.04 kernels. Building against the running kernel is slower on first
+  # boot and correct on every kernel, which is the right trade for a node that
+  # is rebuilt every session.
+  usePrecompiled: false
+
+  # The operator drains and reloads the driver itself on a version change.
+  # One node at a time, which on a one node fleet means the whole fleet, and is
+  # exactly the blast radius worth watching when the fleet is larger.
+  upgradePolicy:
+    autoUpgrade: true
+    maxParallelUpgrades: 1
+    maxUnavailable: 25%
+
+toolkit:
+  enabled: true
+  repository: nvcr.io/nvidia/k8s
+  image: container-toolkit
+  version: v1.20.0
+
+# The device plugin is what turns a GPU into nvidia.com/gpu on the node's
+# allocatable list. Time slicing arrives here in Session D.
+devicePlugin:
+  enabled: true
+
+# DCGM and its exporter ship inside this chart rather than as a separate
+# deployment, which surprised me and is on the findings page. It is enabled by
+# default and the default counter set is missing most of what a Day 2 dashboard
+# needs, so Session B replaces the counters with a ConfigMap of its own.
+dcgm:
+  enabled: true
+
+dcgmExporter:
+  enabled: true
+
+# MIG is not available on an L4, so the manager has nothing to do here.
+migManager:
+  enabled: false
+
+# Neither of these applies to a plain CUDA node.
+gds:
+  enabled: false
+
+vfioManager:
+  enabled: false

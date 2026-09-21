@@ -1,0 +1,60 @@
+# NVIDIA GPU Operator, sync wave 1.
+#
+# This is the Application the whole PoC is about. The NVIDIA driver and the
+# container toolkit are not installed on the node image, not installed by
+# cloud-init and not installed by hand. They are two version strings in
+# gitops/values/gpu-operator.yaml, and changing them is a commit that ArgoCD
+# rolls out.
+#
+# It is wave 1 because it needs the NFD labels from wave 0 to know which nodes
+# are GPU nodes.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gpu-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://helm.ngc.nvidia.com/nvidia
+      chart: gpu-operator
+      targetRevision: v26.7.0
+      helm:
+        releaseName: gpu-operator
+        valueFiles:
+          - $values/gitops/values/gpu-operator.yaml
+
+    - repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gpu-operator
+
+  # The operator's own controllers write status and defaults back into the
+  # ClusterPolicy, which Argo CD would otherwise report as permanent drift.
+  ignoreDifferences:
+    - group: nvidia.com
+      kind: ClusterPolicy
+      jsonPointers:
+        - /status
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

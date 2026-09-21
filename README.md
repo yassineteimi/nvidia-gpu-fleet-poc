@@ -53,8 +53,11 @@ nvidia-gpu-fleet-poc/
 
 ```bash
 cp .env.example .env    # add your Scaleway API keys (gitignored)
+make cluster            # private network and the persistent control plane node, once
+make argocd             # install ArgoCD and hand it this repository, once
 make up                 # provision the GPU node, join it, wait for the GPU to be schedulable
 make down               # drain, remove and destroy the GPU node
+make cost               # how long the GPU has been up and what it has cost
 ```
 
 ## Cost control

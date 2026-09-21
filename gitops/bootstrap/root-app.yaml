@@ -1,0 +1,33 @@
+# The app of apps. This is the only Application applied by hand, and it exists
+# so that nothing else ever has to be. It watches gitops/apps in this
+# repository, so adding a component to the platform is a file in a commit.
+#
+# If you forked this repository, change repoURL and targetRevision here and in
+# every file under gitops/apps.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+    targetRevision: main
+    path: gitops/apps
+    directory:
+      recurse: true
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

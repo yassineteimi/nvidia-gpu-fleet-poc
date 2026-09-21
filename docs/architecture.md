@@ -4,9 +4,9 @@ Two nodes, upstream Kubernetes via kubeadm, no vendor distribution.
 
 ```mermaid
 flowchart LR
-  subgraph PN["Scaleway private network, fr-par-2"]
-    CP["cp-01, persistent<br/>4 vCPU / 8 GB, Ubuntu 22.04<br/>kubeadm control plane, etcd<br/>ArgoCD, Prometheus, Grafana<br/>gpu-remediator"]
-    GPU["gpu-01, ephemeral<br/>L4-1-24G, Ubuntu 22.04<br/>NFD, GPU Operator, DCGM<br/>node-problem-detector<br/>workloads"]
+  subgraph PN["Scaleway private network, fr-par-2, 172.16.32.0/22"]
+    CP["gpu-fleet-cp-01, persistent<br/>PLAY2-MICRO, Ubuntu 22.04<br/>172.16.32.10 reserved in IPAM<br/>kubeadm control plane, etcd<br/>ArgoCD, Prometheus, Grafana<br/>gpu-remediator"]
+    GPU["gpu-fleet-gpu-01, ephemeral<br/>L4-1-24G, Ubuntu 22.04<br/>172.16.32.20 reserved in IPAM<br/>NFD, GPU Operator, DCGM<br/>node-problem-detector<br/>workloads"]
   end
   GIT["GitHub: this repository"] -->|"ArgoCD pulls"| CP
   CP <-->|"kubeadm join, Flannel VXLAN"| GPU
@@ -23,17 +23,33 @@ The control plane persists because Prometheus history has to survive between wee
 sessions. Session D measures goodput across an interrupted training run and records
 a multi-hour burn-in, and neither is possible on a metrics store that resets.
 
+## Addressing
+
+Both private addresses are booked as IPAM reservations before either node is created.
+This is not tidiness. The control plane has to know its own API server address before
+it boots, because that address is the `kubeadm init` advertise address, a certificate
+SAN, and the endpoint the GPU node joins through a week later. Booking it removes the
+chicken and egg problem entirely: the address is a Terraform variable, not a discovery
+step.
+
+Each node still tries DHCP on its private NIC first and falls back to configuring the
+reserved address statically only if DHCP has not delivered it. `node_ip_mode` flips the
+whole cluster to public addressing in one variable if the Private Network proves
+troublesome on the day.
+
 ## Node join
 
-`scripts/gpu-up.sh` applies the GPU node with Terraform, waits for SSH, then asks the
-control plane for a fresh join command and runs it on the new node:
+`scripts/gpu-up.sh` applies the GPU node with Terraform, waits for its bootstrap script
+to finish, then asks the control plane for a fresh join command and runs it on the new
+node:
 
 ```{ .sh .terminal }
-$ ssh cp-01 'sudo kubeadm token create --print-join-command'
+$ ssh root@cp-01 'kubeadm token create --ttl 30m --print-join-command'
 ```
 
 No bootstrap token is committed to Git and `--discovery-token-unsafe-skip-ca-verification`
-is not used. The token is created on demand and expires.
+is not used: the CA hash comes back in the same printed command. The token is created on
+demand and expires in thirty minutes.
 
 ## GitOps layout
 

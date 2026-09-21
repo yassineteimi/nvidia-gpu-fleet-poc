@@ -23,7 +23,8 @@ without a single manual step on the node.
 ```{ .sh .terminal }
 $ git clone https://github.com/yassineteimi/nvidia-gpu-fleet-poc
 $ cd nvidia-gpu-fleet-poc && cp .env.example .env    # fill in Scaleway keys
-$ make up
+$ make cluster && make argocd                        # once
+$ make up                                            # every session
 ```
 
 ---
@@ -35,7 +36,7 @@ claimed until the session that produces it has actually run.
 
 | Session | Scope | Status |
 |---|---|---|
-| A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | Scaffolding |
+| A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | Code written, not yet applied |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | Not started |
 | C | node-problem-detector, remediation controller, fault injection | Not started |
 | D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |

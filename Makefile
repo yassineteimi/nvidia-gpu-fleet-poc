@@ -1,8 +1,14 @@
 SHELL := /bin/bash
-.PHONY: help up down cost burn-in docs docs-serve lint test
+.PHONY: help cluster argocd up down cost burn-in docs docs-serve lint shellcheck fmt test
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
+
+cluster:       ## Create the private network and the persistent control plane node
+	./scripts/cluster-up.sh
+
+argocd:        ## Install ArgoCD and point it at this repository
+	./scripts/bootstrap-argocd.sh
 
 up:            ## Create the GPU node, join it to the cluster, wait for nvidia.com/gpu
 	./scripts/gpu-up.sh
@@ -28,6 +34,13 @@ lint:          ## Fail if an em dash has crept into the repository
 	  echo "em dash found, see above"; exit 1; \
 	fi
 	@echo "no em dashes"
+
+shellcheck:    ## Static check every shell script in scripts/
+	@shellcheck --severity=warning --external-sources scripts/*.sh
+	@echo "shellcheck clean"
+
+fmt:           ## Format and check the Terraform
+	@terraform -chdir=terraform fmt -check -diff
 
 test:          ## Run the remediation controller unit tests, no cluster needed
 	.venv/bin/python -m pytest controllers/gpu-remediator/tests -q

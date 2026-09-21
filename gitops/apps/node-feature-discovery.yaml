@@ -1,0 +1,54 @@
+# Node Feature Discovery, sync wave 0.
+#
+# The GPU Operator can bring its own NFD as a subchart and most installations
+# let it. This one does not. NFD produces the labels that decide which nodes are
+# GPU nodes, and those labels are load bearing for scheduling, for the operator's
+# own node selectors and, from Session C, for the remediation controller. Owning
+# it as its own Application means the version is pinned in Git and visible, and
+# an NFD problem shows up as an NFD problem rather than as a confusing GPU
+# Operator symptom.
+#
+# The chart is published to an OCI registry. Argo CD takes OCI repositories
+# without the oci:// prefix.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: node-feature-discovery
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: registry.k8s.io/nfd/charts
+      chart: node-feature-discovery
+      targetRevision: 0.19.0
+      helm:
+        releaseName: node-feature-discovery
+        valueFiles:
+          - $values/gitops/values/node-feature-discovery.yaml
+
+    - repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: node-feature-discovery
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

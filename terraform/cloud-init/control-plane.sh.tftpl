@@ -1,0 +1,110 @@
+#!/usr/bin/env bash
+#
+# Control plane bootstrap. Runs once, on first boot, as cloud-init user data.
+# Output lands in /var/log/cloud-init-output.log and in the file below.
+#
+set -euo pipefail
+exec > >(tee -a /var/log/gpu-fleet-bootstrap.log) 2>&1
+
+${common}
+
+########################################
+# kubeadm init
+#
+# The API server advertise address is the reserved address, not whatever the
+# node discovers about itself, so this file is identical on every rebuild.
+# Both the private and the public address are certificate SANs: cluster traffic
+# goes over the private network, and kubectl from a laptop comes in on the
+# public one. Without the public SAN the kubeconfig fetched by cluster-up.sh
+# would fail certificate validation.
+########################################
+
+if [ -f /etc/kubernetes/admin.conf ]; then
+  log "control plane already initialised, skipping kubeadm init"
+else
+  cat > /etc/kubernetes/kubeadm-init.yaml <<'EOF'
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  advertiseAddress: ${node_ip}
+  bindPort: 6443
+nodeRegistration:
+  name: ${node_name}
+  criSocket: unix:///run/containerd/containerd.sock
+  kubeletExtraArgs:
+    - name: node-ip
+      value: ${node_ip}
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+clusterName: ${cluster_name}
+controlPlaneEndpoint: "${node_ip}:6443"
+networking:
+  podSubnet: ${pod_subnet}
+  serviceSubnet: ${service_subnet}
+apiServer:
+  certSANs:
+    - ${private_ip}
+    - ${public_ip}
+    - ${node_name}
+    - 127.0.0.1
+    - localhost
+---
+apiVersion: kubelet.config.k8s.io/v1beta1
+kind: KubeletConfiguration
+cgroupDriver: systemd
+EOF
+
+  log "running kubeadm init"
+  kubeadm init --config /etc/kubernetes/kubeadm-init.yaml
+fi
+
+export KUBECONFIG=/etc/kubernetes/admin.conf
+mkdir -p /root/.kube
+install -o root -g root -m 0600 /etc/kubernetes/admin.conf /root/.kube/config
+
+########################################
+# CNI
+#
+# Flannel is pinned to a release tag rather than pulled from latest, so a
+# rebuild six weeks from now produces the same data plane. The stock manifest
+# hardcodes 10.244.0.0/16 in net-conf.json, so it is rewritten to match the pod
+# subnet kubeadm was given rather than assuming the two agree.
+#
+# The interface patch matters on a two network node. Left alone, flannel picks
+# the interface holding the default route, which is the public one, and builds
+# its VXLAN mesh over the internet while the kubelet advertises a private
+# address. --iface-can-reach asks flannel which interface it would use to reach
+# the control plane and pins that, so the data plane follows the same path as
+# everything else. Container index 0 of kube-flannel-ds is the kube-flannel
+# container in ${flannel_version}.
+########################################
+
+FLANNEL_MANIFEST=/var/lib/gpu-fleet/kube-flannel.yml
+retry curl -fsSL -o "$FLANNEL_MANIFEST" \
+  "https://github.com/flannel-io/flannel/releases/download/${flannel_version}/kube-flannel.yml"
+sed -i "s#10.244.0.0/16#${pod_subnet}#g" "$FLANNEL_MANIFEST"
+
+kubectl apply -f "$FLANNEL_MANIFEST"
+kubectl -n kube-flannel rollout status daemonset/kube-flannel-ds --timeout=180s || true
+kubectl -n kube-flannel patch daemonset kube-flannel-ds --type=json \
+  -p '[{"op":"add","path":"/spec/template/spec/containers/0/args/-","value":"--iface-can-reach=${node_ip}"}]'
+kubectl -n kube-flannel rollout status daemonset/kube-flannel-ds --timeout=180s || true
+
+########################################
+# Schedulable control plane
+#
+# The observability stack has to live somewhere, and the GPU node is destroyed
+# at the end of every session. Prometheus history surviving between sessions is
+# the entire reason this node persists, so the control plane taint comes off.
+# It is a deliberate single node compromise, not an oversight.
+########################################
+
+kubectl taint nodes ${node_name} node-role.kubernetes.io/control-plane- || true
+kubectl label node ${node_name} gpu-fleet.io/role=control-plane --overwrite || true
+
+kubectl wait --for=condition=Ready "node/${node_name}" --timeout=300s || true
+kubectl get nodes -o wide || true
+
+touch /var/lib/gpu-fleet/bootstrap-complete
+log "control plane bootstrap complete"

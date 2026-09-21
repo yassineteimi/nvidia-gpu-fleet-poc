@@ -1,0 +1,48 @@
+# Values for the argo-cd chart, applied once by scripts/bootstrap-argocd.sh.
+#
+# This is the only Helm release in the cluster installed by a human running a
+# command. Everything after it, including its own values from Session B onward,
+# arrives through ArgoCD from this repository. Something has to install the
+# thing that installs everything else, and this is it.
+#
+# The cluster is one 4 vCPU control plane node, so the high availability pieces
+# are off. On a real fleet none of these would be.
+
+global:
+  # Argo CD is reached with kubectl port-forward, not through an ingress, so
+  # there is no hostname and no certificate to manage.
+  domain: argocd.local
+
+configs:
+  params:
+    # TLS is terminated at the port-forward, which is a loopback socket on the
+    # operator's laptop. Running the server insecure avoids a self signed
+    # certificate that nothing would meaningfully verify.
+    server.insecure: true
+
+  cm:
+    # Ignore the fields the GPU Operator's own controllers write back into the
+    # resources it owns, so that a synced Application does not immediately drift.
+    resource.compareoptions: |
+      ignoreAggregatedRoles: true
+
+controller:
+  replicas: 1
+
+server:
+  replicas: 1
+
+repoServer:
+  replicas: 1
+
+applicationSet:
+  enabled: false
+
+notifications:
+  enabled: false
+
+dex:
+  enabled: false
+
+redis-ha:
+  enabled: false

@@ -1,0 +1,275 @@
+########################################
+# Common node bootstrap
+#
+# Rendered into both node scripts by Terraform. Everything here is what any
+# kubeadm node needs and nothing here is GPU specific. No NVIDIA package is
+# installed on either node: the driver and the container toolkit are the GPU
+# Operator's job, and that is the point of the whole exercise.
+########################################
+
+log() { echo "[bootstrap $(date -Is)] $*"; }
+
+# Cloud images come up while apt locks are still held by unattended upgrades and
+# while the Scaleway mirrors are still warming, so every network facing step is
+# retried rather than trusted.
+retry() {
+  local attempt=1
+  local max=5
+  until "$@"; do
+    if [ "$attempt" -ge "$max" ]; then
+      log "FAILED after $max attempts: $*"
+      return 1
+    fi
+    log "attempt $attempt failed, retrying in $((attempt * 5))s: $*"
+    sleep $((attempt * 5))
+    attempt=$((attempt + 1))
+  done
+}
+
+wait_for_apt() {
+  for _ in $(seq 1 60); do
+    if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+      return 0
+    fi
+    log "waiting for another apt process to finish"
+    sleep 5
+  done
+  return 0
+}
+
+########################################
+# Identity
+########################################
+
+log "node ${node_name} at ${node_ip}"
+
+hostnamectl set-hostname ${node_name}
+sed -i '/127.0.1.1/d' /etc/hosts
+echo "${node_ip} ${node_name}" >> /etc/hosts
+
+mkdir -p /var/lib/gpu-fleet
+
+########################################
+# Private network interface
+#
+# The private NIC is attached by Terraform as a resource of its own, so it can
+# appear a minute or two after the instance has booted. Its address is booked in
+# IPAM ahead of time, which is what lets the control plane know its own API
+# server address before it exists. DHCP from the Scaleway VPC is tried first,
+# and the reserved address is configured statically only if DHCP has not
+# delivered it. Both paths end with the same address on the same interface.
+########################################
+
+detect_private_iface() {
+  local primary="$1" candidate
+  for candidate in /sys/class/net/*; do
+    candidate=$(basename "$candidate")
+    case "$candidate" in
+      lo | "$primary" | docker* | cni* | flannel* | veth* | kube* | tunl*) continue ;;
+    esac
+    printf '%s\n' "$candidate"
+    return 0
+  done
+  return 1
+}
+
+has_address() {
+  ip -4 -o addr show dev "$1" 2>/dev/null | grep -q " $2/"
+}
+
+write_netplan() {
+  local iface="$1" body="$2"
+  cat > /etc/netplan/60-gpu-fleet-private.yaml <<EOF
+network:
+  version: 2
+  ethernets:
+    $iface:
+$body
+EOF
+  chmod 600 /etc/netplan/60-gpu-fleet-private.yaml
+  netplan apply
+}
+
+configure_private_nic() {
+  local expected="${private_ip}"
+  local prefix="${private_prefix}"
+  local primary iface
+
+  primary=$(ip -o route get 1.1.1.1 2>/dev/null | sed -n 's/.* dev \([^ ]*\).*/\1/p' | head -n1)
+  log "primary interface is $primary"
+
+  iface=""
+  for _ in $(seq 1 60); do
+    iface=$(detect_private_iface "$primary" || true)
+    [ -n "$iface" ] && break
+    sleep 5
+  done
+
+  if [ -z "$iface" ]; then
+    log "no private interface appeared"
+    return 1
+  fi
+
+  log "private interface is $iface"
+  ip link set dev "$iface" up || true
+
+  write_netplan "$iface" "      dhcp4: true
+      dhcp4-overrides:
+        use-routes: false
+        use-dns: false"
+
+  for _ in $(seq 1 12); do
+    if has_address "$iface" "$expected"; then
+      log "DHCP gave $iface the reserved address $expected"
+      return 0
+    fi
+    sleep 5
+  done
+
+  log "DHCP did not deliver $expected, configuring it statically on $iface"
+  write_netplan "$iface" "      dhcp4: false
+      addresses:
+        - $expected/$prefix"
+
+  for _ in $(seq 1 12); do
+    if has_address "$iface" "$expected"; then
+      log "static address $expected is up on $iface"
+      return 0
+    fi
+    sleep 5
+  done
+
+  log "could not put $expected on $iface"
+  return 1
+}
+
+# shellcheck disable=SC2050 # Terraform renders private_nic_required as a literal
+if configure_private_nic; then
+  log "private network ready"
+elif [ "${private_nic_required}" = "true" ]; then
+  log "FATAL: node_ip_mode is private and the private network did not come up"
+  exit 1
+else
+  log "private network unavailable, continuing because node_ip_mode is public"
+fi
+
+########################################
+# Kubelet preconditions
+########################################
+
+swapoff -a || true
+sed -i '/\sswap\s/ s/^/#/' /etc/fstab
+
+cat > /etc/modules-load.d/kubernetes.conf <<'EOF'
+overlay
+br_netfilter
+EOF
+modprobe overlay
+modprobe br_netfilter
+
+cat > /etc/sysctl.d/99-kubernetes.conf <<'EOF'
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+sysctl --system
+
+########################################
+# Base packages
+########################################
+
+export DEBIAN_FRONTEND=noninteractive
+wait_for_apt
+retry apt-get update
+retry apt-get install -y apt-transport-https ca-certificates curl gnupg jq pciutils
+
+install -m 0755 -d /etc/apt/keyrings
+
+########################################
+# containerd
+#
+# containerd.io from the Docker repository ships a config.toml with the CRI
+# plugin in disabled_plugins, which makes kubeadm preflight fail with a socket
+# that answers but serves nothing. Regenerating the default config is not
+# optional, it is the fix.
+########################################
+
+retry curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+
+UBUNTU_CODENAME=$(. /etc/os-release && echo $VERSION_CODENAME)
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" \
+  > /etc/apt/sources.list.d/docker.list
+
+wait_for_apt
+retry apt-get update
+retry apt-get install -y containerd.io
+
+containerd config default > /etc/containerd/config.toml
+sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+
+if ! grep -q 'SystemdCgroup = true' /etc/containerd/config.toml; then
+  log "FATAL: could not set the systemd cgroup driver in containerd"
+  exit 1
+fi
+
+systemctl restart containerd
+systemctl enable containerd
+
+########################################
+# kubeadm, kubelet, kubectl
+#
+# The apt repository is per minor version, so the minor is pinned by the
+# repository itself. Set kubernetes_package_version in terraform.tfvars to pin
+# the patch as well, which is what makes a rebuild identical rather than merely
+# similar.
+########################################
+
+retry curl -fsSL https://pkgs.k8s.io/core:/stable:/v${kubernetes_minor}/deb/Release.key \
+  -o /tmp/kubernetes-release.key
+gpg --dearmor --yes -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg /tmp/kubernetes-release.key
+chmod a+r /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+rm -f /tmp/kubernetes-release.key
+
+echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${kubernetes_minor}/deb/ /" \
+  > /etc/apt/sources.list.d/kubernetes.list
+
+wait_for_apt
+retry apt-get update
+
+K8S_PKG_VERSION="${kubernetes_package_version}"
+if [ -n "$K8S_PKG_VERSION" ]; then
+  log "pinning the kubeadm toolchain to $K8S_PKG_VERSION"
+  retry apt-get install -y \
+    kubelet="$K8S_PKG_VERSION" \
+    kubeadm="$K8S_PKG_VERSION" \
+    kubectl="$K8S_PKG_VERSION"
+else
+  log "installing the newest patch in the ${kubernetes_minor} series"
+  retry apt-get install -y kubelet kubeadm kubectl
+fi
+
+apt-mark hold kubelet kubeadm kubectl containerd.io
+
+echo 'KUBELET_EXTRA_ARGS=--node-ip=${node_ip}' > /etc/default/kubelet
+systemctl enable kubelet
+
+########################################
+# Record what actually landed on the node
+#
+# Session write ups quote this file rather than anyone's memory.
+########################################
+
+{
+  echo "node_name=${node_name}"
+  echo "node_ip=${node_ip}"
+  echo "os=$(. /etc/os-release && echo $PRETTY_NAME)"
+  echo "kernel=$(uname -r)"
+  echo "containerd=$(containerd --version)"
+  echo "kubeadm=$(kubeadm version -o short)"
+  echo "kubelet_package=$(dpkg-query -W -f='$${Version}' kubelet)"
+  echo "bootstrapped_at=$(date -Is)"
+} > /var/lib/gpu-fleet/bootstrap-facts.txt
+
+log "common bootstrap complete"
+cat /var/lib/gpu-fleet/bootstrap-facts.txt

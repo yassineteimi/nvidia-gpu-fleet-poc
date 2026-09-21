@@ -1,0 +1,75 @@
+# Copy to terraform.tfvars and edit. terraform.tfvars is gitignored.
+#
+# Credentials are NOT set here. The Scaleway provider reads them from the
+# environment, so source the gitignored .env first:
+#
+#   set -a && source .env && set +a
+#   cd terraform && terraform init && terraform apply
+
+########################################
+# Placement
+########################################
+
+# fr-par-2 is the primary zone. Switch both of these together to pl-waw-2 and
+# pl-waw if fr-par-2 is out of L4 stock.
+region = "fr-par"
+zone   = "fr-par-2"
+
+cluster_name = "gpu-fleet"
+
+########################################
+# Access
+########################################
+
+ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+
+# Narrow this to your own address if you have a stable one. SSH is key only and
+# the Kubernetes API is client certificate only, so this is defence in depth
+# rather than the only control.
+admin_cidrs = ["0.0.0.0/0"]
+
+########################################
+# Networking
+########################################
+
+private_network_subnet   = "172.16.32.0/22"
+control_plane_private_ip = "172.16.32.10"
+gpu_node_private_ip      = "172.16.32.20"
+
+# "private" keeps cluster traffic on the Scaleway Private Network. Switch to
+# "public" and rebuild both nodes if Private Network DHCP or IPAM misbehaves.
+node_ip_mode = "private"
+
+########################################
+# Nodes
+########################################
+
+control_plane_type                = "PLAY2-MICRO"
+control_plane_root_volume_size_gb = 80
+
+# gpu_node_enabled is left alone here. scripts/gpu-up.sh and scripts/gpu-down.sh
+# own it, through a generated gpu.auto.tfvars, so that the GPU node is never up
+# by accident and never left up by forgetfulness.
+gpu_node_type                = "L4-1-24G"
+gpu_node_root_volume_size_gb = 150
+
+# Do not point this at a Scaleway GPU OS image. Those ship a preinstalled NVIDIA
+# driver, which takes the driver lifecycle away from the GPU Operator. Terraform
+# refuses the label and the node refuses to finish bootstrapping if it finds a
+# driver already there.
+gpu_node_image = "ubuntu_jammy"
+
+########################################
+# Kubernetes
+########################################
+
+kubernetes_minor = "1.36"
+
+# Leave empty on the first apply, then read the installed version off a node and
+# pin it here so that a rebuild is identical rather than merely similar:
+#
+#   ssh root@<control plane> "dpkg-query -W -f='\${Version}' kubeadm"
+#
+kubernetes_package_version = ""
+
+flannel_version = "v0.28.9"

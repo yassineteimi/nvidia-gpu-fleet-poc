@@ -1,0 +1,82 @@
+site_name: "NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes"
+site_author: Yassine TEIMI
+site_url: https://yassineteimi.github.io/nvidia-gpu-fleet-poc/
+site_description: >-
+  Taking a rented NVIDIA L4 node from bare instance to a GitOps-managed, monitored
+  and self-remediating GPU platform on upstream Kubernetes. Driver lifecycle through
+  the GPU Operator, DCGM telemetry and XID alerting, automated cordon and drain on
+  GPU fault, goodput measurement and a cluster acceptance runbook.
+
+repo_name: yassineteimi/nvidia-gpu-fleet-poc
+repo_url: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+
+theme:
+  name: material
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - toc.integrate
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.tabs.link
+    - content.code.annotation
+    - content.code.copy
+  language: en
+  palette:
+    - scheme: slate
+      toggle: { icon: material/toggle-switch, name: Switch to light mode }
+      primary: teal
+      accent: lime
+    - scheme: default
+      toggle: { icon: material/toggle-switch-off-outline, name: Switch to dark mode }
+      primary: teal
+      accent: purple
+
+extra_css:
+  - stylesheets/terminal.css
+
+extra:
+  social:
+    - icon: fontawesome/brands/github-alt
+      link: https://github.com/yassineteimi
+    - icon: fontawesome/brands/linkedin
+      link: https://linkedin.com/in/yassine-teimi
+
+markdown_extensions:
+  - pymdownx.highlight: { anchor_linenums: true }
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.mark
+  - pymdownx.tabbed: { alternate_style: true }
+  - attr_list
+  - md_in_html
+  - footnotes
+  - tables
+
+plugins:
+  - search
+
+nav:
+  - Overview: index.md
+  - "What is simulated": simulated.md
+  - Prerequisites: prerequisites.md
+  - Architecture: architecture.md
+  - Build:
+      - "Session A: platform and GPU lifecycle": 01-platform.md
+      - "Session B: observability and XID alerting": 02-observability.md
+      - "Session C: fault detection and remediation": 03-fault-remediation.md
+      - "Session D: goodput, burn-in and tenancy": 04-goodput-and-burn-in.md
+  - Runbook: runbook.md
+  - Artifacts: artifacts/index.md
+  - Findings: findings.md
+
+copyright: |
+  &copy; 2026 <a href="https://github.com/yassineteimi" target="_blank" rel="noopener">Yassine TEIMI</a>

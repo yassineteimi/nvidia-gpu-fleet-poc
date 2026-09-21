@@ -1,0 +1,28 @@
+# secrets
+.env
+*.pem
+*.key
+kubeconfig
+kubeconfig-*
+
+# terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl
+terraform/*.tfstate
+terraform/*.tfstate.*
+terraform/*.tfvars
+!terraform/terraform.tfvars.example
+terraform/crash.log
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# mkdocs
+site/
+.cache/
+
+# macos
+.DS_Store

@@ -131,4 +131,69 @@ can say what happened to each rather than quietly fixing them:
 
 ## What happened
 
-To be filled in during Session A with real captured output.
+!!! warning "In progress, partial"
+    The control plane and ArgoCD are up. The GPU node has not been provisioned yet,
+    so everything from the join onward is still unwritten. Sections below marked
+    "not yet run" are exactly that, and nothing is filled in from memory.
+
+### Control plane and GitOps bootstrap
+
+Status: **done**, output not yet captured.
+
+`make cluster` provisioned the Private Network and the control plane node and
+returned a working kubeconfig. `make argocd` installed ArgoCD and applied the app of
+apps. The ArgoCD UI is reachable and the root Application is registered.
+
+Capture these into `docs/artifacts/` before the next session, while the cluster is
+still in this state:
+
+```{ .sh .terminal }
+$ kubectl get nodes -o wide                              > docs/artifacts/session-a-nodes.txt
+$ kubectl -n argocd get applications.argoproj.io -o wide > docs/artifacts/session-a-applications.txt
+$ kubectl get nodes -o json | jq '.items[].metadata.labels' > docs/artifacts/session-a-nfd-labels.json
+$ ssh root@<control plane> cat /var/lib/gpu-fleet/bootstrap-facts.txt > docs/artifacts/session-a-cp-facts.txt
+```
+
+The last one is the record of what the bootstrap actually installed: OS, kernel,
+containerd and the exact kubeadm package version. That is the file the version
+table on [Prerequisites](prerequisites.md) gets corrected from, rather than from
+what anyone thinks was pinned.
+
+### Node Feature Discovery, sync wave 0
+
+Status: **not yet verified**.
+
+NFD needs no GPU, so wave 0 reaches Healthy on the control plane alone. The check
+that matters is which labels it produced, because the GPU Operator's node selectors
+depend on the exact form:
+
+```{ .sh .terminal }
+$ kubectl get nodes --show-labels | tr ',' '\n' | grep feature.node
+```
+
+A `pci-10de.present` here would be the label the operator wants. A
+`pci-0300_10de.present` means `deviceLabelFields` did not take, and wave 1 will
+later sync green and schedule nothing. See [Findings](findings.md).
+
+### GPU Operator chart resolution
+
+Status: **not yet verified**.
+
+ArgoCD resolves a chart whether or not there is a GPU node to put it on, so this is
+answerable before spending anything:
+
+```{ .sh .terminal }
+$ kubectl -n argocd get application gpu-operator -o jsonpath='{.status.conditions}'
+```
+
+A `ComparisonError: failed to get chart` means the version string in
+`gitops/apps/gpu-operator.yaml` is wrong. NVIDIA's install documentation uses a `v`
+prefix, which is why it currently asks for `v26.7.0`.
+
+### GPU node, join and driver
+
+Status: **not yet run**.
+
+### CUDA acceptance test
+
+Status: **not yet run**.

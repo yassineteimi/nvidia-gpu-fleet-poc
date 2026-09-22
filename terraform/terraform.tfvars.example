@@ -21,7 +21,14 @@ cluster_name = "gpu-fleet"
 # Access
 ########################################
 
-ssh_public_key_path = "~/.ssh/id_ed25519.pub"
+# The SSH key is NOT configured here. Set SSH_PRIVATE_KEY_PATH in .env and the
+# scripts derive the public key from it, so the key registered on the nodes is
+# always the key you log in with.
+#
+# Uncomment this only if you are running Terraform directly, without the
+# scripts. If you do, make sure it names the same keypair as .env does.
+#
+# ssh_public_key_path = "~/.ssh/id_ed25519.pub"
 
 # Narrow this to your own address if you have a stable one. SSH is key only and
 # the Kubernetes API is client certificate only, so this is defence in depth

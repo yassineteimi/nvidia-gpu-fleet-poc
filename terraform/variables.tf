@@ -28,8 +28,25 @@ variable "cluster_name" {
 # Access
 ########################################
 
+variable "ssh_public_key" {
+  description = <<-EOT
+    Public SSH key material to register on both nodes. The scripts derive this
+    from SSH_PRIVATE_KEY_PATH in .env and export it as TF_VAR_ssh_public_key, so
+    the key on the nodes is by construction the key you log in with. Leave it
+    empty and ssh_public_key_path is read instead, which is what happens when
+    Terraform is run directly rather than through scripts/.
+  EOT
+  type        = string
+  default     = ""
+}
+
 variable "ssh_public_key_path" {
-  description = "Path to the public SSH key registered on both nodes."
+  description = <<-EOT
+    Fallback path to a public SSH key file, used only when ssh_public_key is
+    empty. Prefer letting the scripts supply the key: a path here and a
+    different path in .env is a mismatch nothing catches until the SSH wait
+    loop times out.
+  EOT
   type        = string
   default     = "~/.ssh/id_ed25519.pub"
 }

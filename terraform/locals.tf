@@ -1,6 +1,14 @@
 locals {
   tags = ["gpu-fleet-poc", var.cluster_name]
 
+  # The key material wins when the scripts supply it. The file path is the
+  # fallback for running Terraform by hand, and it is wrapped in try() because
+  # Terraform evaluates both branches of a conditional, so an unreadable path
+  # would fail even when the material is right there.
+  ssh_public_key = trimspace(
+    var.ssh_public_key != "" ? var.ssh_public_key : try(file(pathexpand(var.ssh_public_key_path)), "")
+  )
+
   control_plane_name = "${var.cluster_name}-cp-01"
   gpu_node_name      = "${var.cluster_name}-gpu-01"
 

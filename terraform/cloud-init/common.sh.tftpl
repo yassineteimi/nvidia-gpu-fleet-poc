@@ -26,15 +26,18 @@ retry() {
   done
 }
 
-wait_for_apt() {
-  for _ in $(seq 1 60); do
-    if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
-      return 0
-    fi
-    log "waiting for another apt process to finish"
-    sleep 5
-  done
-  return 0
+# A fresh Ubuntu 22.04 instance runs unattended-upgrades within seconds of first
+# boot, and it holds the dpkg lock for minutes. The classic workaround is to poll
+# with fuser, which is worse than useless here: fuser lives in psmisc, which is
+# not on a minimal cloud image, so the poll returns immediately and the apt call
+# fails on the lock anyway.
+#
+# apt 2.4 on jammy takes DPkg::Lock::Timeout, which blocks properly rather than
+# guessing. Disabling unattended-upgrades would also work and is what a lot of
+# provisioning scripts do, but a node that declines security updates to save two
+# minutes is not a node worth demonstrating.
+apt_get() {
+  DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 "$@"
 }
 
 ########################################
@@ -178,10 +181,8 @@ sysctl --system
 # Base packages
 ########################################
 
-export DEBIAN_FRONTEND=noninteractive
-wait_for_apt
-retry apt-get update
-retry apt-get install -y apt-transport-https ca-certificates curl gnupg jq pciutils
+retry apt_get update
+retry apt_get install -y apt-transport-https ca-certificates curl gnupg jq pciutils
 
 install -m 0755 -d /etc/apt/keyrings
 
@@ -201,9 +202,8 @@ UBUNTU_CODENAME=$(. /etc/os-release && echo $VERSION_CODENAME)
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" \
   > /etc/apt/sources.list.d/docker.list
 
-wait_for_apt
-retry apt-get update
-retry apt-get install -y containerd.io
+retry apt_get update
+retry apt_get install -y containerd.io
 
 containerd config default > /etc/containerd/config.toml
 sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
@@ -234,19 +234,18 @@ rm -f /tmp/kubernetes-release.key
 echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v${kubernetes_minor}/deb/ /" \
   > /etc/apt/sources.list.d/kubernetes.list
 
-wait_for_apt
-retry apt-get update
+retry apt_get update
 
 K8S_PKG_VERSION="${kubernetes_package_version}"
 if [ -n "$K8S_PKG_VERSION" ]; then
   log "pinning the kubeadm toolchain to $K8S_PKG_VERSION"
-  retry apt-get install -y \
+  retry apt_get install -y \
     kubelet="$K8S_PKG_VERSION" \
     kubeadm="$K8S_PKG_VERSION" \
     kubectl="$K8S_PKG_VERSION"
 else
   log "installing the newest patch in the ${kubernetes_minor} series"
-  retry apt-get install -y kubelet kubeadm kubectl
+  retry apt_get install -y kubelet kubeadm kubectl
 fi
 
 apt-mark hold kubelet kubeadm kubectl containerd.io

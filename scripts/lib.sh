@@ -66,9 +66,60 @@ load_env() {
   : "${SCW_SECRET_KEY:?SCW_SECRET_KEY is not set in .env}"
   : "${SCW_DEFAULT_PROJECT_ID:?SCW_DEFAULT_PROJECT_ID is not set in .env}"
 
+  resolve_ssh_keypair
+}
+
+# One keypair, one setting.
+#
+# The public key is derived from the private key and handed to Terraform as
+# TF_VAR_ssh_public_key, so the key registered on the nodes is by construction
+# the key used to log in to them. The alternative, a public key path in
+# terraform.tfvars and a private key path in .env, invites setting one and
+# forgetting the other, and you find out ten minutes into an apply when the
+# SSH wait loop times out against a node you cannot get into.
+resolve_ssh_keypair() {
   SSH_PRIVATE_KEY_PATH="${SSH_PRIVATE_KEY_PATH:-$HOME/.ssh/id_ed25519}"
   SSH_PRIVATE_KEY_PATH="${SSH_PRIVATE_KEY_PATH/#\~/$HOME}"
-  [ -f "$SSH_PRIVATE_KEY_PATH" ] || die "SSH private key not found at $SSH_PRIVATE_KEY_PATH"
+
+  if [ ! -f "$SSH_PRIVATE_KEY_PATH" ]; then
+    warn "no SSH private key at $SSH_PRIVATE_KEY_PATH"
+    warn "generate one with:"
+    warn "  ssh-keygen -t ed25519 -f $SSH_PRIVATE_KEY_PATH -C gpu-fleet-poc"
+    die "set SSH_PRIVATE_KEY_PATH in .env to point at an existing key"
+  fi
+
+  # -P "" supplies an empty passphrase, so an encrypted key fails here instead
+  # of hanging on an interactive prompt inside a script.
+  local derived
+  derived="$(ssh-keygen -y -P "" -f "$SSH_PRIVATE_KEY_PATH" 2>/dev/null || true)"
+
+  if [ -n "$derived" ]; then
+    SSH_PUBLIC_KEY="$derived"
+  elif [ -f "$SSH_PRIVATE_KEY_PATH.pub" ]; then
+    warn "$SSH_PRIVATE_KEY_PATH appears to be passphrase protected"
+    warn "using $SSH_PRIVATE_KEY_PATH.pub without being able to prove the two are a pair"
+    SSH_PUBLIC_KEY="$(cat "$SSH_PRIVATE_KEY_PATH.pub")"
+  else
+    die "could not derive a public key from $SSH_PRIVATE_KEY_PATH and there is no .pub beside it"
+  fi
+
+  # ssh-keygen -y prints two fields and no comment. Scaleway is happier with a
+  # third, and it makes the key recognisable in the console.
+  case "$SSH_PUBLIC_KEY" in
+    *" "*" "*) : ;;
+    *) SSH_PUBLIC_KEY="$SSH_PUBLIC_KEY gpu-fleet-poc" ;;
+  esac
+
+  case "$SSH_PUBLIC_KEY" in
+    "ssh-rsa "*)
+      warn "$SSH_PRIVATE_KEY_PATH is an RSA key. Ubuntu 22.04 negotiates rsa-sha2-256 or"
+      warn "rsa-sha2-512 with a current client, so this works, but ed25519 is the better"
+      warn "default for a cluster you rebuild every week:"
+      warn "  ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_gpu_fleet -C gpu-fleet-poc"
+      ;;
+  esac
+
+  export TF_VAR_ssh_public_key="$SSH_PUBLIC_KEY"
 }
 
 tf() {

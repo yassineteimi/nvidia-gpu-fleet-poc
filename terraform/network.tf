@@ -4,7 +4,14 @@
 
 resource "scaleway_iam_ssh_key" "admin" {
   name       = "${var.cluster_name}-admin"
-  public_key = trimspace(file(pathexpand(var.ssh_public_key_path)))
+  public_key = local.ssh_public_key
+
+  lifecycle {
+    precondition {
+      condition     = local.ssh_public_key != ""
+      error_message = "No SSH public key. Run scripts/cluster-up.sh, which derives it from SSH_PRIVATE_KEY_PATH in .env, or point ssh_public_key_path at a readable .pub file."
+    }
+  }
 }
 
 ########################################

@@ -45,9 +45,32 @@ $ cp terraform/terraform.tfvars.example terraform/terraform.tfvars
 $ $EDITOR terraform/terraform.tfvars
 ```
 
-`.env` holds the Scaleway API keys and the paths to your SSH keypair. Terraform
+`.env` holds the Scaleway API keys and the path to your SSH private key. Terraform
 never reads a credential from `terraform.tfvars`: the provider takes them from the
 environment, which is why every script sources `.env` before doing anything.
+
+### The SSH key
+
+Set `SSH_PRIVATE_KEY_PATH` in `.env` and nothing else. The scripts derive the public
+key from it with `ssh-keygen -y` and pass it to Terraform as `TF_VAR_ssh_public_key`,
+so the key registered on the nodes is by construction the key you log in with.
+
+The obvious alternative, a public key path in `terraform.tfvars` and a private key
+path in `.env`, has one failure mode and it is expensive: set one, forget the other,
+and you find out ten minutes into an apply when the SSH wait loop times out against
+a node you cannot get into.
+
+ed25519 is the right default on Ubuntu 22.04. An existing RSA key works, and the
+scripts will say so on the way past, but a key scoped to this project is tidier:
+
+```{ .sh .terminal }
+$ ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_gpu_fleet -C gpu-fleet-poc
+```
+
+A passphrase protected key is fine, but `ssh-keygen -y` cannot read it without
+prompting, so the scripts fall back to the `.pub` file beside it and say that they
+could not verify the two are a pair. Load it into `ssh-agent` before starting a
+session or the wait loops will stall on a passphrase prompt.
 
 ## Bringing it up
 

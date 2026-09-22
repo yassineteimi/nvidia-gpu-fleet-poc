@@ -236,6 +236,15 @@ wrong version string would have surfaced here as `ComparisonError: failed to get
 chart`, and it would otherwise have surfaced about thirty five minutes into a billed
 session.
 
+The capture in
+[`session-a-applications.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-a-applications.txt)
+was taken a few minutes earlier and shows `root` as `OutOfSync` against revision
+`4c61ae3`. That is not a fault, it is the polling interval: commits had landed on
+`main` and ArgoCD had not yet noticed. It reconciled itself on the next pass with no
+intervention, which is the behaviour `selfHeal` is there to provide. The artifact is
+left as captured rather than retaken, because a record that only ever shows the
+steady state is not much of a record.
+
 !!! warning "Green here does not mean working"
     `gpu-operator` reports Healthy with zero GPUs in the cluster. Its DaemonSets
     select on a label no node carries yet, so they are satisfied by having nothing to

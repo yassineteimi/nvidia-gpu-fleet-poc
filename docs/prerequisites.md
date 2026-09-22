@@ -16,7 +16,7 @@ replaced with the exact versions actually used once Session A has run.
 | Tool | Version | Needed for |
 |---|---|---|
 | Terraform | 1.9 or newer | Node provisioning |
-| kubectl | matching the cluster minor, currently 1.36 | Everything |
+| kubectl | matching the cluster minor, which is 1.36 | Everything |
 | helm | 3.14 or newer | ArgoCD bootstrap only |
 | shellcheck | any | `make shellcheck` before committing |
 | gh | any | Repo and Pages setup |

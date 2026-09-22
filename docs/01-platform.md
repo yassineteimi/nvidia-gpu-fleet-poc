@@ -128,17 +128,16 @@ answers it, rather than quietly fixed:
   volume type constraint is for it and for `L4-1-24G`. **Half answered**: the control
   plane provisioned with `sbs_volume`, so that half holds. The L4 is untested.
 - Whether Scaleway's Private Network DHCP configures a NIC attached after boot without
-  the netplan fallback in `common.sh.tftpl` having to fire. The control plane is on
-  the network, but which of the two paths got it there is in the bootstrap log and has
-  not been read yet:
+  the netplan fallback in `common.sh.tftpl` having to fire. **Half answered**: the node
+  is up on `172.16.32.10`, the reserved address, so one of the two paths worked. Which
+  one is in the bootstrap log and has not been read yet:
 
     ```{ .sh .terminal }
     $ ssh root@<control plane> "grep -E 'DHCP|statically' /var/log/gpu-fleet-bootstrap.log"
     ```
 
-- Which exact Kubernetes patch version the pinned minor resolves to, which then gets
-  written back into `terraform.tfvars` so the cluster rebuilds identically. The
-  captured `bootstrap-facts.txt` has it.
+- ~~Which exact Kubernetes patch version the pinned minor resolves to.~~
+  **Answered: `1.36.4-1.1`**, now pinned in `terraform.tfvars.example`.
 
 ## What happened
 
@@ -149,26 +148,52 @@ answers it, rather than quietly fixed:
 
 ### Control plane and GitOps bootstrap
 
-Status: **done**, output not yet captured.
+Status: **done**.
 
 `make cluster` provisioned the Private Network and the control plane node and
 returned a working kubeconfig. `make argocd` installed ArgoCD and applied the app of
-apps. The ArgoCD UI is reachable and the root Application is registered.
-
-Capture these into `docs/artifacts/` before the next session, while the cluster is
-still in this state:
+apps.
 
 ```{ .sh .terminal }
-$ kubectl get nodes -o wide                              > docs/artifacts/session-a-nodes.txt
-$ kubectl -n argocd get applications.argoproj.io -o wide > docs/artifacts/session-a-applications.txt
-$ kubectl get nodes -o json | jq '.items[].metadata.labels' > docs/artifacts/session-a-nfd-labels.json
-$ ssh root@<control plane> cat /var/lib/gpu-fleet/bootstrap-facts.txt > docs/artifacts/session-a-cp-facts.txt
+$ kubectl get nodes -o wide
+NAME              STATUS   ROLES           AGE   VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION               CONTAINER-RUNTIME
+gpu-fleet-cp-01   Ready    control-plane   35m   v1.36.4   172.16.32.10   <none>        Ubuntu 22.04.5 LTS   5.15.0-190-generic (amd64)   containerd://2.3.5
 ```
 
-The last one is the record of what the bootstrap actually installed: OS, kernel,
-containerd and the exact kubeadm package version. That is the file the version
-table on [Prerequisites](prerequisites.md) gets corrected from, rather than from
-what anyone thinks was pinned.
+`INTERNAL-IP` is `172.16.32.10`, which is the address booked in IPAM by
+`terraform/network.tf` before the node existed. The kubelet is advertising the
+address the API server certificate was issued for and the address the GPU node will
+later join through, because all three are the same variable.
+
+Each node writes what its bootstrap actually installed to
+`/var/lib/gpu-fleet/bootstrap-facts.txt`, which is where these numbers come from
+rather than from anyone's recollection of what was pinned:
+
+```{ .sh .terminal }
+$ ssh root@cp-01 cat /var/lib/gpu-fleet/bootstrap-facts.txt
+node_name=gpu-fleet-cp-01
+node_ip=172.16.32.10
+os=Ubuntu 22.04.5 LTS
+kernel=5.15.0-190-generic
+containerd=containerd containerd v2.3.5 1294c24a7da8e5a793ed378161673abe94118892
+kubeadm=v1.36.4
+kubelet_package=1.36.4-1.1
+bootstrapped_at=2026-09-22T13:42:30+00:00
+```
+
+`kubelet_package=1.36.4-1.1` is the answer to the last open question, and it is now
+`kubernetes_package_version` in `terraform.tfvars.example`. Before this the
+repository pinned a minor and took whatever patch apt served that day, which makes a
+rebuild similar rather than identical. Now it is identical.
+
+The containerd version is worth a second look. `containerd.io` from the Docker
+repository is on the 2.x series, which uses config schema version 3, where the
+runtime options moved to `[plugins.'io.containerd.cri.v1.runtime'...]`. The
+bootstrap sets the cgroup driver with a blanket substitution on
+`SystemdCgroup = false`, which survives that move because the key name did not
+change. The node reaching Ready is the proof it landed: a wrong cgroup driver does
+not fail loudly, it produces a kubelet that starts and then misbehaves under
+memory pressure.
 
 ### Both Applications resolve and sync, with no GPU in the cluster
 

@@ -72,11 +72,13 @@ gpu_node_image = "ubuntu_jammy"
 
 kubernetes_minor = "1.36"
 
-# Leave empty on the first apply, then read the installed version off a node and
-# pin it here so that a rebuild is identical rather than merely similar:
+# The exact patch the pinned minor resolved to on the first apply, read off the
+# node rather than assumed. With this set a rebuild is identical rather than
+# merely similar. To find it again after a minor bump:
 #
 #   ssh root@<control plane> "dpkg-query -W -f='\${Version}' kubeadm"
 #
-kubernetes_package_version = ""
+# or read /var/lib/gpu-fleet/bootstrap-facts.txt, which every node writes.
+kubernetes_package_version = "1.36.4-1.1"
 
 flannel_version = "v0.28.9"

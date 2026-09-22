@@ -116,18 +116,29 @@ the CA hash comes back in the same printed command.
 
 ## Open questions for the session
 
-Things that are written down but unverified, listed here so that the session write up
-can say what happened to each rather than quietly fixing them:
+Things that were written down but unverified. Each is struck through as the session
+answers it, rather than quietly fixed:
 
-- Whether the NVIDIA Helm repository serves the GPU Operator chart as `v26.7.0` or
-  `26.7.0`. NVIDIA's install documentation uses the `v` prefix, so that is what
-  `gitops/apps/gpu-operator.yaml` asks for.
+- ~~Whether the NVIDIA Helm repository serves the GPU Operator chart as `v26.7.0` or
+  `26.7.0`.~~ **Answered: `v26.7.0`, with the prefix.** The Application syncs.
+- ~~Whether NFD produces `pci-10de.present` or `pci-0300_10de.present`.~~
+  **Answered: the vendor only form.** Confirmed on a virtio NIC before any GPU
+  existed, which made it free.
 - Whether `PLAY2-MICRO` is offered in `fr-par-2` at 4 vCPU and 8 GB, and what the root
-  volume type constraint is for it and for `L4-1-24G`.
+  volume type constraint is for it and for `L4-1-24G`. **Half answered**: the control
+  plane provisioned with `sbs_volume`, so that half holds. The L4 is untested.
 - Whether Scaleway's Private Network DHCP configures a NIC attached after boot without
-  the netplan fallback in `common.sh.tftpl` having to fire.
+  the netplan fallback in `common.sh.tftpl` having to fire. The control plane is on
+  the network, but which of the two paths got it there is in the bootstrap log and has
+  not been read yet:
+
+    ```{ .sh .terminal }
+    $ ssh root@<control plane> "grep -E 'DHCP|statically' /var/log/gpu-fleet-bootstrap.log"
+    ```
+
 - Which exact Kubernetes patch version the pinned minor resolves to, which then gets
-  written back into `terraform.tfvars` so the cluster rebuilds identically.
+  written back into `terraform.tfvars` so the cluster rebuilds identically. The
+  captured `bootstrap-facts.txt` has it.
 
 ## What happened
 
@@ -159,36 +170,79 @@ containerd and the exact kubeadm package version. That is the file the version
 table on [Prerequisites](prerequisites.md) gets corrected from, rather than from
 what anyone thinks was pinned.
 
+### Both Applications resolve and sync, with no GPU in the cluster
+
+Status: **done**.
+
+ArgoCD pulls and renders a chart whether or not there is a node to put it on, so the
+riskiest unknown in the whole session was answerable before spending anything on a
+GPU:
+
+```{ .sh .terminal }
+$ kubectl -n argocd get applications.argoproj.io
+NAME                     SYNC STATUS   HEALTH STATUS
+gpu-operator             Synced        Healthy
+node-feature-discovery   Synced        Healthy
+root                     Synced        Healthy
+```
+
+That settles the GPU Operator chart version. NVIDIA's Helm repository serves it as
+`v26.7.0`, with the `v`, which is what `gitops/apps/gpu-operator.yaml` asks for. A
+wrong version string would have surfaced here as `ComparisonError: failed to get
+chart`, and it would otherwise have surfaced about thirty five minutes into a billed
+session.
+
+!!! warning "Green here does not mean working"
+    `gpu-operator` reports Healthy with zero GPUs in the cluster. Its DaemonSets
+    select on a label no node carries yet, so they are satisfied by having nothing to
+    schedule. This is worth saying plainly because it is the kind of green that gets
+    mistaken for a passing test. The real acceptance test is a CUDA pod, and it has
+    not run.
+
 ### Node Feature Discovery, sync wave 0
 
-Status: **not yet verified**.
+Status: **done**, and it confirms the configuration decision.
 
-NFD needs no GPU, so wave 0 reaches Healthy on the control plane alone. The check
-that matters is which labels it produced, because the GPU Operator's node selectors
-depend on the exact form:
+```{ .sh .terminal }
+$ kubectl -n node-feature-discovery get pods
+NAME                                             READY   STATUS    RESTARTS   AGE
+node-feature-discovery-gc-7774bfb87f-78lz6       1/1     Running   0          28m
+node-feature-discovery-master-7d4f8679f8-g7jdt   1/1     Running   0          28m
+node-feature-discovery-worker-6m6p5              1/1     Running   0          28m
+```
+
+One line in the label dump is worth more than the rest of it put together:
 
 ```{ .sh .terminal }
 $ kubectl get nodes --show-labels | tr ',' '\n' | grep feature.node
+...
+feature.node.kubernetes.io/pci-1af4.present=true
+...
 ```
 
-A `pci-10de.present` here would be the label the operator wants. A
-`pci-0300_10de.present` means `deviceLabelFields` did not take, and wave 1 will
-later sync green and schedule nothing. See [Findings](findings.md).
+`1af4` is the virtio vendor ID, from the paravirtual NIC on the control plane. The
+label is `pci-<vendor>.present`, with no device class in it, which is the proof that
+`deviceLabelFields: [vendor]` took effect. Had the chart default of `[class, vendor]`
+been in force, this would read `pci-0200_1af4.present` instead, and by the same
+mechanism the GPU node would later come up labelled `pci-0300_10de.present` while
+every GPU Operator component sat waiting for `pci-10de.present`. See
+[Findings](findings.md) for why that matters and how it was nearly missed.
 
-### GPU Operator chart resolution
+Checking this against a virtio NIC on a CPU node, rather than against a real GPU,
+costs nothing and answers the question a week earlier.
 
-Status: **not yet verified**.
+The same dump confirms the node is what Terraform was asked for:
 
-ArgoCD resolves a chart whether or not there is a GPU node to put it on, so this is
-answerable before spending anything:
+| Label | Value |
+|---|---|
+| `system-os_release.ID` | `ubuntu` |
+| `system-os_release.VERSION_ID` | `22.04` |
+| `kernel-version.full` | `5.15.0-190-generic` |
+| `cpu-model.vendor_id` | `AMD` |
+| `cpu-model.hypervisor` | `kvm` |
 
-```{ .sh .terminal }
-$ kubectl -n argocd get application gpu-operator -o jsonpath='{.status.conditions}'
-```
-
-A `ComparisonError: failed to get chart` means the version string in
-`gitops/apps/gpu-operator.yaml` is wrong. NVIDIA's install documentation uses a `v`
-prefix, which is why it currently asks for `v26.7.0`.
+No `nvidia.com/*` labels, correctly: GPU Feature Discovery ships inside the GPU
+Operator and has no GPU to describe yet.
 
 ### GPU node, join and driver
 

@@ -49,6 +49,16 @@ rather than guessed, and written into
 [`gitops/values/node-feature-discovery.yaml`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/gitops/values/node-feature-discovery.yaml)
 with the reasoning next to it.
 
+**Confirmed during Session A, on a CPU node, for nothing.** The control plane's
+virtio NIC came back labelled `feature.node.kubernetes.io/pci-1af4.present`, vendor
+only, with no device class in the label. That is the same code path that will later
+produce `pci-10de.present` for an L4. Had `deviceLabelFields` not taken, the label
+would have read `pci-0200_1af4.present` and the GPU node would have arrived a week
+later carrying `pci-0300_10de.present` while every GPU Operator component waited for
+a label that never comes. Worth generalising: a configuration that decides whether
+GPU scheduling works can often be tested against whatever hardware is already in the
+cluster, days before the expensive hardware shows up.
+
 ## During the build
 
 **The ArgoCD initial admin password is rejected, and the password is fine.** The

@@ -127,14 +127,9 @@ answers it, rather than quietly fixed:
 - Whether `PLAY2-MICRO` is offered in `fr-par-2` at 4 vCPU and 8 GB, and what the root
   volume type constraint is for it and for `L4-1-24G`. **Half answered**: the control
   plane provisioned with `sbs_volume`, so that half holds. The L4 is untested.
-- Whether Scaleway's Private Network DHCP configures a NIC attached after boot without
-  the netplan fallback in `common.sh.tftpl` having to fire. **Half answered**: the node
-  is up on `172.16.32.10`, the reserved address, so one of the two paths worked. Which
-  one is in the bootstrap log and has not been read yet:
-
-    ```{ .sh .terminal }
-    $ ssh root@<control plane> "grep -E 'DHCP|statically' /var/log/gpu-fleet-bootstrap.log"
-    ```
+- ~~Whether Scaleway's Private Network DHCP configures a NIC attached after boot
+  without the netplan fallback in `common.sh.tftpl` having to fire.~~
+  **Answered: DHCP delivered it, the static fallback never ran.**
 
 - ~~Which exact Kubernetes patch version the pinned minor resolves to.~~
   **Answered: `1.36.4-1.1`**, now pinned in `terraform.tfvars.example`.
@@ -142,9 +137,10 @@ answers it, rather than quietly fixed:
 ## What happened
 
 !!! warning "In progress, partial"
-    The control plane and ArgoCD are up. The GPU node has not been provisioned yet,
-    so everything from the join onward is still unwritten. Sections below marked
-    "not yet run" are exactly that, and nothing is filled in from memory.
+    The control plane and ArgoCD are up, and three of the four open questions below
+    are closed without a GPU ever having been rented. The GPU node has not been
+    provisioned, so everything from the join onward is still unwritten. Sections
+    marked "not yet run" are exactly that, and nothing is filled in from memory.
 
 ### Control plane and GitOps bootstrap
 
@@ -164,6 +160,29 @@ gpu-fleet-cp-01   Ready    control-plane   35m   v1.36.4   172.16.32.10   <none>
 `terraform/network.tf` before the node existed. The kubelet is advertising the
 address the API server certificate was issued for and the address the GPU node will
 later join through, because all three are the same variable.
+
+The private NIC is attached by Terraform as a separate resource, so it appears after
+the instance has booted. The bootstrap waits for a non primary interface to show up,
+writes it a netplan stanza asking for DHCP, and only falls back to configuring the
+reserved address statically if DHCP has not produced it within a minute. On this
+node the first path was enough:
+
+```{ .sh .terminal }
+$ ssh root@cp-01 "grep -E 'DHCP|statically' /var/log/gpu-fleet-bootstrap.log"
+[bootstrap 2026-09-22T13:41:58+00:00] DHCP gave ens6 the reserved address 172.16.32.10
+```
+
+Two things in one line. Scaleway's VPC DHCP does hand out the IPAM reservation to a
+NIC attached after boot, so the static fallback is insurance rather than the main
+path. And the interface came up as `ens6`, which is why the script detects it by
+elimination rather than naming it: the number depends on how many NICs the instance
+already had, so hardcoding it would work on the control plane and break on a GPU
+node with a different device layout.
+
+What this does not prove is that the netplan stanza was necessary. The bootstrap
+writes it before waiting, so it cannot distinguish between Scaleway's image
+configuring the interface on its own and our configuration doing it. That question
+is not worth an experiment, because the fallback has to exist either way.
 
 Each node writes what its bootstrap actually installed to
 `/var/lib/gpu-fleet/bootstrap-facts.txt`, which is where these numbers come from

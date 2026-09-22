@@ -84,6 +84,19 @@ $ make up         # create the GPU node, join it, wait for nvidia.com/gpu
 $ make down       # drain it, remove it from the cluster, destroy it
 ```
 
+`make argocd-ui` prints the admin credentials and port-forwards the UI to
+`http://localhost:8080`. Plain HTTP, because `server.insecure` is set and the
+port-forward is a loopback socket.
+
+!!! note "If the ArgoCD password is rejected"
+    Decoding the initial admin secret by hand with `base64 -d` prints a password
+    with no trailing newline, so the shell prompt lands flush against the last
+    character and you copy the prompt with it. `make argocd-ui` prints it on a
+    line of its own. If the password is genuinely wrong, the initial secret is
+    stale: ArgoCD leaves it in place after the admin password changes, and a
+    repeated `helm upgrade` can regenerate the hash without touching it. The
+    script compares the two timestamps and says so when that has happened.
+
 !!! danger "make down is not optional"
     `make up` starts an hourly meter and `make down` is the only thing that stops
     it. `make cost` will tell you whether one is running.

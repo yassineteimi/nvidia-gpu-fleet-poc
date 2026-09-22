@@ -46,14 +46,9 @@ The root Application syncs, in order:
 Nothing NVIDIA is installed until a GPU node exists, so this will look idle
 until you run make up.
 
-Open the UI:
+Open the UI with:
 
-  kubectl --kubeconfig $KUBECONFIG_PATH -n $ARGOCD_NAMESPACE port-forward svc/argocd-server 8080:80
-
-  user:     admin
-  password: kubectl --kubeconfig $KUBECONFIG_PATH -n $ARGOCD_NAMESPACE \\
-              get secret argocd-initial-admin-secret \\
-              -o jsonpath='{.data.password}' | base64 -d
+  make argocd-ui
 
 Note: the Applications under gitops/apps reference this repository on branch
 main. If you are working on another branch, ArgoCD will sync main, not your

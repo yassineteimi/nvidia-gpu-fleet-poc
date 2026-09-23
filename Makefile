@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: help cluster argocd argocd-ui up down cost burn-in docs docs-serve lint shellcheck fmt test
+.PHONY: help cluster argocd argocd-ui gpu-images up down cost burn-in docs docs-serve lint shellcheck fmt test
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -12,6 +12,9 @@ argocd:        ## Install ArgoCD and point it at this repository
 
 argocd-ui:     ## Print the ArgoCD admin credentials and port-forward the UI
 	./scripts/argocd-ui.sh
+
+gpu-images:    ## List the images Scaleway will boot on the GPU node type
+	./scripts/gpu-images.sh
 
 up:            ## Create the GPU node, join it to the cluster, wait for nvidia.com/gpu
 	./scripts/gpu-up.sh

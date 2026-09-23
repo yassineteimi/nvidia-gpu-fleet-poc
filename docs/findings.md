@@ -28,8 +28,9 @@ of truth. It is a design decision, not a workaround.
 
 **The Scaleway GPU image choice matters.** `ubuntu_jammy_gpu_os` ships with NVIDIA
 drivers preinstalled. Using it would take the driver lifecycle away from the GPU
-Operator, which is the single thing this PoC exists to demonstrate. Plain
-`ubuntu_jammy` is used instead.
+Operator, which is the single thing this PoC exists to demonstrate. The plan was
+plain `ubuntu_jammy` instead. That plan did not survive contact with the API: see
+the first entry under "During the build".
 
 **Deploying NFD separately means inheriting the GPU Operator's NFD configuration.**
 Setting `nfd.enabled=false` and running Node Feature Discovery as its own ArgoCD
@@ -60,6 +61,51 @@ GPU scheduling works can often be tested against whatever hardware is already in
 cluster, days before the expensive hardware shows up.
 
 ## During the build
+
+**Scaleway will not boot plain Ubuntu on a GPU instance.** The first `make up`
+failed before any GPU was billed:
+
+```text
+could not get image 'fr-par-2/ubuntu_jammy': couldn't find a local image
+for the given zone (fr-par-2) and commercial type (L4-1-24G)
+```
+
+GPU instance types only accept images the marketplace flags as compatible with
+them. Asking the marketplace directly (`make gpu-images`) for everything compatible
+with `L4-1-24G` in fr-par-2 returned exactly four labels:
+
+| Label | What it is |
+|---|---|
+| `ubuntu_jammy_gpu_os_12` | GPU OS, NVIDIA driver preinstalled |
+| `ubuntu_noble_gpu_os_12` | GPU OS, NVIDIA driver preinstalled |
+| `ubuntu_noble_gpu_os_13_nvidia` | GPU OS, NVIDIA driver preinstalled |
+| `kapsule_noble` | Scaleway's managed Kubernetes node image |
+
+No plain `ubuntu_jammy`, no plain `ubuntu_noble`. The pre-session plan assumed a
+plain image existed and the Terraform validation was written to refuse only the
+`gpu_os` ones, which was the right refusal pointed at an option that was never
+there.
+
+The way out was in Scaleway's own documentation for its managed Kubernetes. On
+Kapsule GPU pools, "the GPU Operator installs the drivers shortly after node
+creation": the node boots `kapsule_noble` without a driver and the operator puts
+one there. That is precisely the pattern this PoC demonstrates, done by the
+provider itself, so the GPU node now boots `kapsule_noble`. The driver lifecycle
+stays with the GPU Operator and stays pinned in Git.
+
+Two costs, both stated rather than hidden. The GPU node runs Ubuntu 24.04 while
+the control plane stays on 22.04, which Kubernetes does not mind but which is a
+mixed fleet. And `kapsule_noble` is built for Scaleway's managed clusters, not for
+kubeadm, so it may arrive carrying its own container runtime or Kubernetes
+components. The bootstrap now records an inventory of what the image shipped
+before changing anything, and checks for a driver before installing anything, so
+a surprise costs one minute of L4 time rather than ten.
+
+Querying the marketplace had its own trap: the `local-images` endpoint returns
+`400` unless exactly one of image ID, version ID or image label is set, so it cannot
+be asked "what is in this zone" in one call. The first version of `make gpu-images`
+was written from memory and got a `400` on every page. The second was written from
+the request struct in Scaleway's Go SDK.
 
 **The ArgoCD initial admin password is rejected, and the password is fine.** The
 documented way to read it is to decode `argocd-initial-admin-secret` with

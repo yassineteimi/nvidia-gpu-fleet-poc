@@ -21,7 +21,7 @@ driver:
   version: "595.91.07"
 
   # Precompiled driver packages are still a tech preview and only for some
-  # Ubuntu 22.04 kernels. Building against the running kernel is slower on first
+  # Ubuntu kernels. Building against the running kernel is slower on first
   # boot and correct on every kernel, which is the right trade for a node that
   # is rebuilt every session.
   usePrecompiled: false

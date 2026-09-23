@@ -58,7 +58,7 @@ gitops/
 
 ## Decisions worth defending
 
-### The GPU node boots a plain Ubuntu image
+### The GPU node boots a driverless image
 
 Scaleway publishes GPU OS images with the NVIDIA driver and container toolkit already
 installed. Booting one would work, and it would quietly delete the point of this
@@ -66,7 +66,14 @@ project: the driver lifecycle would belong to the image rather than to the GPU
 Operator. So there are two gates against it. Terraform refuses any image label
 containing `gpu_os`, and the GPU node's own bootstrap script exits non zero if it
 finds `nvidia-smi`, `/dev/nvidia0` or a loaded `nvidia` kernel module. The first
-checks the intent, the second checks the result.
+checks the intent, the second checks the result, and the second now runs before
+anything is installed, because every minute on that node is billed.
+
+The original plan was plain `ubuntu_jammy`. Scaleway does not offer it on GPU
+instance types, which the first `make up` discovered. The image actually used is
+`kapsule_noble`, the one Scaleway's own managed Kubernetes boots on GPU pools before
+its GPU Operator installs the driver. How that was found is in
+[Findings](findings.md).
 
 ### Node addresses are reserved in IPAM before the nodes exist
 
@@ -127,6 +134,10 @@ answers it, rather than quietly fixed:
 - Whether `PLAY2-MICRO` is offered in `fr-par-2` at 4 vCPU and 8 GB, and what the root
   volume type constraint is for it and for `L4-1-24G`. **Half answered**: the control
   plane provisioned with `sbs_volume`, so that half holds. The L4 is untested.
+- A question nobody wrote down, answered by the first `make up`: **Scaleway does not
+  offer plain Ubuntu on the L4 at all.** The GPU node now boots `kapsule_noble`.
+  Whether that image arrives carrying Kubernetes components that clash with kubeadm
+  is the new open question, and the bootstrap's image inventory will answer it.
 - ~~Whether Scaleway's Private Network DHCP configures a NIC attached after boot
   without the netplan fallback in `common.sh.tftpl` having to fire.~~
   **Answered: DHCP delivered it, the static fallback never ran.**

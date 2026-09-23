@@ -168,18 +168,24 @@ variable "gpu_node_root_volume_size_gb" {
 
 variable "gpu_node_image" {
   description = <<-EOT
-    Scaleway image label for the GPU node. This must be a plain Ubuntu image.
-    Scaleway also publishes GPU OS images with the NVIDIA driver and container
-    toolkit preinstalled. Using one of those would take the driver lifecycle away
-    from the GPU Operator, which is the single thing this PoC exists to
-    demonstrate, so the validation below refuses them.
+    Scaleway image label for the GPU node. It must boot without an NVIDIA driver.
+
+    Plain ubuntu_jammy and ubuntu_noble are not offered on GPU instance types:
+    the marketplace only flags GPU OS images and kapsule_noble as compatible with
+    L4-1-24G. GPU OS images ship the driver and container toolkit preinstalled,
+    which would take the driver lifecycle away from the GPU Operator, so the
+    validation below refuses them. kapsule_noble is what Scaleway's managed
+    Kubernetes boots on GPU pools before its own GPU Operator installs the
+    driver, which is the pattern this PoC demonstrates.
+
+    Check what a zone offers with: make gpu-images
   EOT
   type        = string
-  default     = "ubuntu_jammy"
+  default     = "kapsule_noble"
 
   validation {
     condition     = !can(regex("gpu_os", var.gpu_node_image))
-    error_message = "The GPU node must boot a plain Ubuntu image. A gpu_os image ships preinstalled NVIDIA drivers and would bypass the GPU Operator."
+    error_message = "The GPU node must boot a driverless image. A gpu_os image ships preinstalled NVIDIA drivers and would bypass the GPU Operator. Run make gpu-images to see what the zone offers."
   }
 }
 

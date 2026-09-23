@@ -6,6 +6,8 @@
 set -euo pipefail
 exec > >(tee -a /var/log/gpu-fleet-bootstrap.log) 2>&1
 
+log() { echo "[bootstrap $(date -Is)] $*"; }
+
 ${common}
 
 ########################################

@@ -60,11 +60,15 @@ control_plane_root_volume_size_gb = 80
 gpu_node_type                = "L4-1-24G"
 gpu_node_root_volume_size_gb = 150
 
-# Do not point this at a Scaleway GPU OS image. Those ship a preinstalled NVIDIA
-# driver, which takes the driver lifecycle away from the GPU Operator. Terraform
-# refuses the label and the node refuses to finish bootstrapping if it finds a
-# driver already there.
-gpu_node_image = "ubuntu_jammy"
+# Scaleway does not offer plain Ubuntu on GPU instance types. kapsule_noble is
+# the driverless image its managed Kubernetes boots on GPU pools, with the GPU
+# Operator installing the driver afterwards, which is the pattern here. Run
+# make gpu-images to see what a zone offers.
+#
+# Do not point this at a GPU OS image. Those ship a preinstalled NVIDIA driver,
+# which takes the driver lifecycle away from the GPU Operator. Terraform refuses
+# the label and the node refuses to finish bootstrapping if it finds a driver.
+gpu_node_image = "kapsule_noble"
 
 ########################################
 # Kubernetes

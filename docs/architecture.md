@@ -6,7 +6,7 @@ Two nodes, upstream Kubernetes via kubeadm, no vendor distribution.
 flowchart LR
   subgraph PN["Scaleway private network, fr-par-2, 172.16.32.0/22"]
     CP["gpu-fleet-cp-01, persistent<br/>PLAY2-MICRO, Ubuntu 22.04<br/>172.16.32.10 reserved in IPAM<br/>kubeadm control plane, etcd<br/>ArgoCD, Prometheus, Grafana<br/>gpu-remediator"]
-    GPU["gpu-fleet-gpu-01, ephemeral<br/>L4-1-24G, Ubuntu 22.04<br/>172.16.32.20 reserved in IPAM<br/>NFD, GPU Operator, DCGM<br/>node-problem-detector<br/>workloads"]
+    GPU["gpu-fleet-gpu-01, ephemeral<br/>L4-1-24G, kapsule_noble, Ubuntu 24.04<br/>172.16.32.20 reserved in IPAM<br/>NFD, GPU Operator, DCGM<br/>node-problem-detector<br/>workloads"]
   end
   GIT["GitHub: this repository"] -->|"ArgoCD pulls"| CP
   CP <-->|"kubeadm join, Flannel VXLAN"| GPU

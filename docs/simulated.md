@@ -16,7 +16,10 @@ was not produced by real hardware doing a real thing, it is listed below.
 Worth stating explicitly, because these are the parts most easily faked and were not:
 
 - The NVIDIA driver and container toolkit are installed by the GPU Operator on a
-  plain Ubuntu image. No preinstalled-driver image was used.
+  driverless image. No preinstalled-driver image was used. Scaleway offers no plain
+  Ubuntu on GPU instances, so the image is `kapsule_noble`, the one its own managed
+  Kubernetes boots before its GPU Operator installs the driver. The node checks for
+  a driver on first boot and refuses to continue if it finds one.
 - Every component is deployed by ArgoCD from this repository. Nothing was installed
   by hand after the ArgoCD bootstrap.
 - The utilisation-collapse alert in Session B fires on a genuinely killed job, not

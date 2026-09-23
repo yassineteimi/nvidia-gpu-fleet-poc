@@ -7,7 +7,7 @@
 # Operator's job, and that is the point of the whole exercise.
 ########################################
 
-log() { echo "[bootstrap $(date -Is)] $*"; }
+# log() is defined by the role script this block is rendered into.
 
 # Cloud images come up while apt locks are still held by unattended upgrades and
 # while the Scaleway mirrors are still warming, so every network facing step is
@@ -26,14 +26,15 @@ retry() {
   done
 }
 
-# A fresh Ubuntu 22.04 instance runs unattended-upgrades within seconds of first
+# A fresh Ubuntu instance runs unattended-upgrades within seconds of first
 # boot, and it holds the dpkg lock for minutes. The classic workaround is to poll
 # with fuser, which is worse than useless here: fuser lives in psmisc, which is
 # not on a minimal cloud image, so the poll returns immediately and the apt call
 # fails on the lock anyway.
 #
-# apt 2.4 on jammy takes DPkg::Lock::Timeout, which blocks properly rather than
-# guessing. Disabling unattended-upgrades would also work and is what a lot of
+# apt 2.4 and later, on both Jammy and Noble, takes DPkg::Lock::Timeout, which
+# blocks properly rather than guessing. Disabling unattended-upgrades would also
+# work and is what a lot of
 # provisioning scripts do, but a node that declines security updates to save two
 # minutes is not a node worth demonstrating.
 apt_get() {
@@ -236,16 +237,19 @@ echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.
 
 retry apt_get update
 
+# The pinned version is the one this cluster runs, so it wins over anything the
+# image arrived with. An image built for a managed Kubernetes can carry its own
+# kubelet, held at its own version, and apt would otherwise refuse to move it.
 K8S_PKG_VERSION="${kubernetes_package_version}"
 if [ -n "$K8S_PKG_VERSION" ]; then
   log "pinning the kubeadm toolchain to $K8S_PKG_VERSION"
-  retry apt_get install -y \
+  retry apt_get install -y --allow-change-held-packages --allow-downgrades \
     kubelet="$K8S_PKG_VERSION" \
     kubeadm="$K8S_PKG_VERSION" \
     kubectl="$K8S_PKG_VERSION"
 else
   log "installing the newest patch in the ${kubernetes_minor} series"
-  retry apt_get install -y kubelet kubeadm kubectl
+  retry apt_get install -y --allow-change-held-packages kubelet kubeadm kubectl
 fi
 
 apt-mark hold kubelet kubeadm kubectl containerd.io

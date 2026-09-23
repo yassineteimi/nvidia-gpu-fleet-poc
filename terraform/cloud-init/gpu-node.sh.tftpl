@@ -3,11 +3,16 @@
 # GPU node bootstrap. Runs once, on first boot, as cloud-init user data.
 #
 # This node deliberately installs no NVIDIA software at all. No driver, no
-# container toolkit, no CUDA, no DKMS, nothing. It boots a plain Ubuntu image
-# and stops at a kubeadm ready state. Everything NVIDIA arrives later, from the
-# GPU Operator, driven by ArgoCD from Git. That is the capability this PoC
-# exists to demonstrate, and pre-baking any of it on the image would quietly
+# container toolkit, no CUDA, no DKMS, nothing. Everything NVIDIA arrives later,
+# from the GPU Operator, driven by ArgoCD from Git. That is the capability this
+# PoC exists to demonstrate, and pre-baking any of it on the image would quietly
 # delete the demonstration.
+#
+# The image is kapsule_noble, not a plain Ubuntu. Scaleway offers no plain Ubuntu
+# for GPU instance types, only its GPU OS images with the driver preinstalled and
+# kapsule_noble, which is what its own managed Kubernetes boots on GPU pools
+# before its GPU Operator installs the driver. Same pattern as here. See
+# docs/findings.md.
 #
 # The node does not join the cluster here either. Joining needs a token, and a
 # token that lived in Git or in Terraform state would be a token committed to a
@@ -17,27 +22,62 @@
 set -euo pipefail
 exec > >(tee -a /var/log/gpu-fleet-bootstrap.log) 2>&1
 
-${common}
+log() { echo "[bootstrap $(date -Is)] $*"; }
 
 ########################################
-# Assert the image is clean
+# Inventory the image before touching it
 #
-# A Scaleway GPU OS image ships the driver and the container toolkit
-# preinstalled. Booting one by accident would not fail loudly: the GPU would
-# work, pods would see it, and the driver lifecycle story would be a fiction.
-# Terraform already refuses a gpu_os image label, and this is the second gate,
-# on the node itself, checking the result rather than the intent.
+# kapsule_noble is built for Scaleway's managed Kubernetes, so it may ship its
+# own container runtime or Kubernetes components. Recording exactly what was on
+# the image before this script changed anything is what makes a clash later in
+# the bootstrap diagnosable rather than mysterious.
+########################################
+
+mkdir -p /var/lib/gpu-fleet
+{
+  echo "== os"
+  . /etc/os-release && echo "$PRETTY_NAME"
+  uname -r
+  echo "== binaries"
+  for bin in nvidia-smi containerd runc kubelet kubeadm kubectl docker crictl; do
+    printf '%-12s %s\n' "$bin" "$(command -v "$bin" || echo absent)"
+  done
+  echo "== packages"
+  dpkg-query -W -f='$${Package} $${Version}\n' 2>/dev/null \
+    | grep -E '^(nvidia|libnvidia|cuda|containerd|runc|kube|docker|cri-)' || echo "none of interest"
+  echo "== units"
+  systemctl list-unit-files --no-legend 2>/dev/null \
+    | grep -E 'kubelet|containerd|docker|nvidia' || echo "none of interest"
+  echo "== kernel modules"
+  lsmod | grep -E '^(nvidia|nouveau)' || echo "no nvidia or nouveau module loaded"
+} > /var/lib/gpu-fleet/image-inventory.txt 2>&1 || true
+
+log "image inventory, before any change:"
+cat /var/lib/gpu-fleet/image-inventory.txt
+
+########################################
+# Assert the image is driverless, before spending time on anything else
+#
+# A GPU OS image ships the driver and the container toolkit preinstalled.
+# Booting one by accident would not fail loudly: the GPU would work, pods would
+# see it, and the driver lifecycle story would be a fiction. Terraform already
+# refuses a gpu_os image label. This is the second gate, on the node itself,
+# checking the result rather than the intent, and it runs first because every
+# minute on this node is billed.
 ########################################
 
 if command -v nvidia-smi >/dev/null 2>&1 \
   || [ -e /dev/nvidia0 ] \
   || lsmod | grep -q '^nvidia'; then
   log "FATAL: this image already carries an NVIDIA driver"
-  log "The GPU Operator must own the driver lifecycle. Boot a plain Ubuntu image."
+  log "The GPU Operator must own the driver lifecycle. Boot a driverless image."
   exit 1
 fi
 
 log "no NVIDIA driver present, as intended"
+
+${common}
+
 lspci -nn | grep -i nvidia || log "no NVIDIA PCI device reported by lspci"
 
 ########################################

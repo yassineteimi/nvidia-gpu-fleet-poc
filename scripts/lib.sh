@@ -62,6 +62,14 @@ load_env() {
   set +a
   set_rates
 
+  # The provider lets these override the zone and region in terraform.tfvars,
+  # which would make the documented pl-waw-2 fallback a silent no-op. The
+  # tfvars file is the single source for placement, so drop them here.
+  if [ -n "${SCW_DEFAULT_ZONE:-}" ] || [ -n "${SCW_DEFAULT_REGION:-}" ]; then
+    warn "ignoring SCW_DEFAULT_ZONE and SCW_DEFAULT_REGION from .env; placement comes from terraform.tfvars"
+    unset SCW_DEFAULT_ZONE SCW_DEFAULT_REGION
+  fi
+
   : "${SCW_ACCESS_KEY:?SCW_ACCESS_KEY is not set in .env}"
   : "${SCW_SECRET_KEY:?SCW_SECRET_KEY is not set in .env}"
   : "${SCW_DEFAULT_PROJECT_ID:?SCW_DEFAULT_PROJECT_ID is not set in .env}"

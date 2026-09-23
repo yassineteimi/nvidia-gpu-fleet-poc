@@ -23,16 +23,32 @@ ZONE="${ZONE:-fr-par-2}"
 TYPE="${2:-$(tf_output gpu_node_type)}"
 TYPE="${TYPE:-L4-1-24G}"
 
-log "image labels Scaleway offers for $TYPE in $ZONE"
+API="https://api.scaleway.com/marketplace/v2"
 
+scw_get() {
+  curl -fsS -H "X-Auth-Token: $SCW_SECRET_KEY" "$API/$1"
+}
+
+# The local-images endpoint requires exactly one of image_id, version_id or
+# image_label, so it cannot be asked "everything in this zone". Take the label
+# list from the images endpoint first, then ask about each label in turn.
+log "listing marketplace image labels"
+all_labels="$(
+  for page in 1 2 3; do
+    scw_get "images?arch=x86_64&page_size=100&page=$page"
+  done | jq -r '.images[]?.label' | sort -u
+)"
+[ -n "$all_labels" ] || die "the marketplace returned no image labels"
+
+log "asking which of $(printf '%s\n' "$all_labels" | wc -l | tr -d ' ') labels will boot on $TYPE in $ZONE"
 labels="$(
-  for page in 1 2 3 4 5; do
-    curl -fsS -H "X-Auth-Token: $SCW_SECRET_KEY" \
-      "https://api.scaleway.com/marketplace/v2/local-images?zone=$ZONE&page_size=100&page=$page"
-  done | jq -r --arg t "$TYPE" '
-    .local_images[]?
-    | select(.compatible_commercial_types | index($t))
-    | [.label, .arch, .type] | @tsv' | sort -u
+  printf '%s\n' "$all_labels" | while read -r label; do
+    scw_get "local-images?image_label=$label&zone=$ZONE&page_size=100" \
+      | jq -r --arg t "$TYPE" '
+          .local_images[]?
+          | select(.compatible_commercial_types | index($t))
+          | [.label, .arch, .type] | @tsv'
+  done | sort -u
 )"
 
 if [ -z "$labels" ]; then

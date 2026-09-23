@@ -40,7 +40,7 @@ gpu_node_enabled = true
 EOF
 
 log "terraform apply, creating the GPU node"
-tf apply -input=false -auto-approve
+apply_gpu_only
 
 GPU_PUBLIC_IP="$(tf_output gpu_node_public_ip)"
 GPU_NODE_NAME="$(tf_output gpu_node_name)"

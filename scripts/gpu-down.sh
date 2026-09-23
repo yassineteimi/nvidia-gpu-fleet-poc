@@ -55,7 +55,7 @@ gpu_node_enabled = false
 EOF
 
 log "terraform apply, destroying the GPU node"
-tf apply -input=false -auto-approve
+apply_gpu_only
 
 [ -n "$GPU_PUBLIC_IP" ] && forget_host "$GPU_PUBLIC_IP"
 

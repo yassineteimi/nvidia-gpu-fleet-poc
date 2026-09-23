@@ -126,6 +126,35 @@ tf() {
   terraform -chdir="$TF_DIR" "$@"
 }
 
+# Apply only when the plan leaves everything except the GPU node alone.
+#
+# gpu-up and gpu-down apply the whole configuration, not a target, so a plan
+# that wanted to replace the control plane would go through unprompted and take
+# etcd with it. The realistic trigger is Scaleway publishing a newer ubuntu_jammy
+# image between sessions. This saves the plan, refuses it if anything outside the
+# GPU node would be destroyed or replaced, and applies exactly the plan that was
+# checked, so nothing can change between the check and the apply.
+apply_gpu_only() {
+  local plan="$TF_DIR/gpu.tfplan"
+  local unsafe
+
+  tf plan -input=false -out="$plan"
+
+  unsafe="$(terraform -chdir="$TF_DIR" show -no-color "$plan" \
+    | grep -E '# .* (will be destroyed|must be replaced)' \
+    | grep -v 'gpu_node' || true)"
+
+  if [ -n "$unsafe" ]; then
+    rm -f "$plan"
+    warn "the plan would destroy or replace something that is not the GPU node:"
+    printf '    %s\n' "$unsafe" >&2
+    die "refusing to apply. Run terraform plan in terraform/ and read it before going further."
+  fi
+
+  tf apply -input=false "$plan"
+  rm -f "$plan"
+}
+
 tf_output() {
   terraform -chdir="$TF_DIR" output -raw "$1" 2>/dev/null || true
 }

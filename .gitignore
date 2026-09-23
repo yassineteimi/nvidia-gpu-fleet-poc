@@ -32,3 +32,6 @@ site/
 
 # macos
 .DS_Store
+
+# saved plans from apply_gpu_only in scripts/lib.sh
+terraform/*.tfplan

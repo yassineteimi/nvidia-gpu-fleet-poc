@@ -88,7 +88,11 @@ lspci -nn | grep -i nvidia || log "no NVIDIA PCI device reported by lspci"
 # the hour.
 ########################################
 
-kubeadm config images pull --cri-socket unix:///run/containerd/containerd.sock || true
+# Pinned to the installed kubeadm's own version. Without it kubeadm asks the
+# internet for the newest patch in the series and pulls that instead, which on
+# the first real run meant v1.36.5 images for a v1.36.4 cluster.
+kubeadm config images pull --kubernetes-version "$(kubeadm version -o short)" \
+  --cri-socket unix:///run/containerd/containerd.sock || true
 
 touch /var/lib/gpu-fleet/bootstrap-complete
 log "GPU node bootstrap complete, waiting to be joined"

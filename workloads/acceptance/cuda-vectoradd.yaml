@@ -1,0 +1,22 @@
+# Session A acceptance test, part 1: a CUDA kernel runs on the GPU and checks
+# its own arithmetic. The pod asks for nvidia.com/gpu, so it can only schedule
+# once the device plugin has advertised the L4, and it can only pass once the
+# driver the GPU Operator installed is loaded and working.
+#
+# Image tag taken from NVIDIA's own gpu-operator repository at v26.7.0 rather
+# than guessed. An Ubuntu 22.04 userland on a 24.04 host is fine: the container
+# brings its own libraries and the toolkit injects the host driver.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cuda-vectoradd
+  labels:
+    app.kubernetes.io/part-of: gpu-acceptance
+spec:
+  restartPolicy: Never
+  containers:
+    - name: cuda-vectoradd
+      image: nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0-ubuntu22.04
+      resources:
+        limits:
+          nvidia.com/gpu: 1

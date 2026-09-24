@@ -1,0 +1,19 @@
+# Session A acceptance test, part 2: nvidia-smi from inside a container. Shows
+# the GPU model and, more to the point, the driver version, which must be the
+# one pinned in gitops/values/gpu-operator.yaml. The container ships no driver;
+# what it reports is what the GPU Operator put on the node.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: nvidia-smi
+  labels:
+    app.kubernetes.io/part-of: gpu-acceptance
+spec:
+  restartPolicy: Never
+  containers:
+    - name: nvidia-smi
+      image: nvcr.io/nvidia/cuda:12.6.0-base-ubuntu22.04
+      command: ["nvidia-smi"]
+      resources:
+        limits:
+          nvidia.com/gpu: 1

@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: help cluster argocd argocd-ui gpu-images up down cost burn-in docs docs-serve lint shellcheck fmt test
+.PHONY: help cluster argocd argocd-ui gpu-images up acceptance down cost burn-in docs docs-serve lint shellcheck fmt test
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -18,6 +18,9 @@ gpu-images:    ## List the images Scaleway will boot on the GPU node type
 
 up:            ## Create the GPU node, join it to the cluster, wait for nvidia.com/gpu
 	./scripts/gpu-up.sh
+
+acceptance:    ## Run the Session A CUDA acceptance test and save the evidence
+	./scripts/acceptance.sh
 
 down:          ## Drain the GPU node, remove it from the cluster, destroy it
 	./scripts/gpu-down.sh

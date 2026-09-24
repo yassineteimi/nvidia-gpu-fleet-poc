@@ -135,9 +135,13 @@ answers it, rather than quietly fixed:
   volume type constraint is for it and for `L4-1-24G`. **Half answered**: the control
   plane provisioned with `sbs_volume`, so that half holds. The L4 is untested.
 - A question nobody wrote down, answered by the first `make up`: **Scaleway does not
-  offer plain Ubuntu on the L4 at all.** The GPU node now boots `kapsule_noble`.
-  Whether that image arrives carrying Kubernetes components that clash with kubeadm
-  is the new open question, and the bootstrap's image inventory will answer it.
+  offer plain Ubuntu on the L4 at all.** The GPU node now boots `kapsule_noble`,
+  which the second `make up` confirmed the L4 accepts. Whether that image arrives
+  carrying Kubernetes components that clash with kubeadm is the new open question,
+  and the bootstrap's image inventory will answer it.
+- Another nobody wrote down, answered by the second `make up`: **the L4 quota is
+  zero until the Organization's identity is verified.** Blocked on the account, not
+  the code. See [Prerequisites](prerequisites.md).
 - ~~Whether Scaleway's Private Network DHCP configures a NIC attached after boot
   without the netplan fallback in `common.sh.tftpl` having to fire.~~
   **Answered: DHCP delivered it, the static fallback never ran.**

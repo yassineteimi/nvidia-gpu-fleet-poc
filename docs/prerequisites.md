@@ -2,9 +2,20 @@
 
 ## Accounts
 
-- A Scaleway account with API keys. GPU instances in `fr-par-2` need no quota
-  request in practice, but check L4 stock before booking a session rather than at
-  the start of one.
+- A Scaleway account with API keys, a validated payment method, **and a verified
+  identity**. The last one is not optional for this project. Scaleway's quota for
+  `L4-1-24G` is zero until the Organization's identity is verified, and one after,
+  and the failure only shows up at the moment the GPU node is created:
+
+    ```text
+    quota exceeded(s): cp_servers_type_L4_1_24G has reached its quota (0/0)
+    ```
+
+    Verification is done once, in the console, from the Organization dashboard, with
+    a government photo ID and a camera, and has to be completed within 15 minutes of
+    starting. Do it before the first session, not during one. The quota it unlocks is
+    one L4 at a time, which is exactly what this project uses, and is why
+    `make down` has to finish before the next `make up`.
 - A GitHub account. The repository must be public so that ArgoCD can pull it without
   credentials, which is what makes the reproduce path on the landing page real.
 

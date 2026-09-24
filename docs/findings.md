@@ -101,6 +101,21 @@ components. The bootstrap now records an inventory of what the image shipped
 before changing anything, and checks for a driver before installing anything, so
 a surprise costs one minute of L4 time rather than ten.
 
+With `kapsule_noble` the next `make up` got further, past image resolution, and
+stopped one step later on something no image choice fixes:
+
+```text
+quota exceeded(s): cp_servers_type_L4_1_24G has reached its quota (0/0)
+```
+
+Scaleway's quota for `L4-1-24G` is zero for an Organization with a validated payment
+method and one once its identity is also verified. The prerequisites page had
+claimed GPU instances in fr-par-2 "need no quota request in practice". That was
+written from general impressions, not from Scaleway's quota table, and it was
+wrong. The page now says what the table says. The useful side of the failure is
+that it proves `kapsule_noble` is accepted for an L4: the image lookup is what
+failed before, and this time it passed.
+
 Querying the marketplace had its own trap: the `local-images` endpoint returns
 `400` unless exactly one of image ID, version ID or image label is set, so it cannot
 be asked "what is in this zone" in one call. The first version of `make gpu-images`

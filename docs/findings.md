@@ -96,7 +96,11 @@ fatal XID on a node, which is usually the only one there is before the node is
 lost. The rule in `gitops/manifests/observability/gpu-alerts.yaml` has a second
 branch that fires on a series which exists now and did not five minutes ago. The
 unit tests include that case, and replacing the rule with the naive one makes
-that test fail, which was checked rather than assumed.
+that test fail, which was checked rather than assumed. The dashboard had the same
+bug and nobody tested it: in Session B the injected XID 79 fired the alert, the
+"Last XID seen" stat read 79, and the "XIDs by code" panel, written with `increase()`,
+stayed flat at 0. So did the clock events panel, for a power cap that was on for twenty
+minutes. Both panels now plot the cumulative count.
 
 **`increase()` also counts restarts that did not happen.** The same function has the
 opposite problem on a counter that is born partway through the window, and this

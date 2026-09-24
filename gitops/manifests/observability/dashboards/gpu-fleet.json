@@ -775,8 +775,8 @@
     {
       "id": 18,
       "type": "timeseries",
-      "title": "Clock events by reason",
-      "description": "Each time a throttle reason turns on, per reason. Counted by the exporter from DCGM_FI_DEV_CLOCKS_EVENT_REASONS.",
+      "title": "Clock events by reason, since exporter start",
+      "description": "How many times each throttle reason has turned on since the exporter started. A cumulative count, for the same reason as the XID panel: a reason that turns on once and stays on is a series born at 1, which increase() reads as 0. Counted by the exporter from DCGM_FI_DEV_CLOCKS_EVENT_REASONS.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -793,7 +793,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (clock_event) (increase(DCGM_EXP_CLOCK_EVENTS_TOTAL{Hostname=~\"$Hostname\"}[$__rate_interval]))",
+          "expr": "sum by (clock_event) (DCGM_EXP_CLOCK_EVENTS_TOTAL{Hostname=~\"$Hostname\"})",
           "legendFormat": "{{clock_event}}",
           "refId": "A",
           "range": true
@@ -836,8 +836,8 @@
     {
       "id": 20,
       "type": "timeseries",
-      "title": "XIDs by code",
-      "description": "Every XID the exporter counted, one series per code. Codes 13, 31, 43, 45, 68 and 109 are application errors; anything else is a GPU fault as far as the NVIDIA device plugin is concerned.",
+      "title": "XIDs by code, since exporter start",
+      "description": "How many times each XID has occurred since the exporter started, one series per code. A cumulative count, not a rate: a series is born at 1 on its first XID, and increase() over it reads 0, which hid the first XID from this panel in Session B. Codes 13, 31, 43, 45, 68 and 109 are application errors; anything else is a GPU fault as far as the NVIDIA device plugin is concerned.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -854,7 +854,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (xid) (increase(DCGM_EXP_XID_ERRORS_TOTAL{Hostname=~\"$Hostname\"}[$__rate_interval]))",
+          "expr": "sum by (xid) (DCGM_EXP_XID_ERRORS_TOTAL{Hostname=~\"$Hostname\"})",
           "legendFormat": "XID {{xid}}",
           "refId": "A",
           "range": true

@@ -1,9 +1,8 @@
 # GitOps layout
 
-Everything the cluster runs is declared here. The only thing installed by a
-person is ArgoCD itself, by `scripts/bootstrap-argocd.sh`, and the last thing
-that script does is apply `bootstrap/root-app.yaml`, after which nothing else is
-installed by a person again.
+Everything the cluster runs is declared here. The one thing a person installs is
+ArgoCD, through `scripts/bootstrap-argocd.sh`. That script's last step applies
+`bootstrap/root-app.yaml`, and from then on ArgoCD installs everything else.
 
 ```text
 gitops/
@@ -20,11 +19,10 @@ Every Application has two sources. The first is the upstream chart, untouched
 and pinned to a version. The second is this repository, present only as a `ref`
 so that the values file can be referenced as `$values/gitops/values/<name>.yaml`.
 
-The alternative is vendoring upstream charts into this repository, which makes
-upgrades a merge exercise, or inlining values into the Application, which puts
-YAML that wants reviewing inside YAML that wants leaving alone. This way the
-chart stays upstream, the configuration stays reviewable, and a version bump is
-a one line diff.
+I didn't want to vendor upstream charts, which turns every upgrade into a merge,
+or to inline values in the Application, which buries the YAML you review inside
+YAML you shouldn't touch. This way the chart stays upstream, the configuration is
+easy to review, and a version bump is a one-line diff.
 
 ## Sync waves
 
@@ -37,26 +35,25 @@ a one line diff.
 | 3 | node-problem-detector, gpu-remediator | C |
 | 4 | Tenant namespaces and quotas | D |
 
-Waves 3 and 4 do not exist yet. They are added by the session that builds them,
-not before.
+Waves 3 and 4 don't exist yet; each gets added by the session that builds it.
 
-Three orderings matter. Storage before anything that asks for a volume.
-Node Feature Discovery before the GPU Operator, which selects nodes on NFD's
-labels. And kube-prometheus-stack before the GPU Operator, which is why it moved
-from wave 1 to wave 0 in Session B: the operator enables a ServiceMonitor for the
-DCGM exporter by default, and a ServiceMonitor only exists once the Prometheus
-Operator's CRDs do.
+Three orderings matter:
 
-> **Waves only order readiness because of a setting.** ArgoCD stopped assessing
-> the health of `Application` resources in version 1.8. Without it, waves between
-> child Applications in an app of apps only order their *creation*: wave 1 is
-> created the moment wave 0 is, not once wave 0 is healthy.
-> `bootstrap/argocd-values.yaml` restores the health check that ArgoCD's own
-> documentation gives for this. Session A ran without it, which is written up in
-> [Findings](../docs/findings.md).
+- storage before anything that asks for a volume;
+- Node Feature Discovery before the GPU Operator, which selects nodes on NFD's labels;
+- kube-prometheus-stack before the GPU Operator. That's why it moved from wave 1 to
+  wave 0 in Session B: the operator creates a ServiceMonitor for the DCGM exporter by
+  default, and that can't exist until the Prometheus Operator's CRDs do.
+
+> **The waves only wait for readiness because of one setting.** ArgoCD stopped
+> assessing the health of `Application` resources in version 1.8. Without that
+> check, waves between child Applications in an app of apps only order their
+> *creation*: wave 1 gets created as soon as wave 0 does, healthy or not.
+> `bootstrap/argocd-values.yaml` restores the health check from ArgoCD's own
+> documentation. Session A ran without it; see [Findings](../docs/findings.md).
 
 ## If you forked this
 
-`bootstrap/root-app.yaml` and every file in `apps/` name this repository by URL
-and reference branch `main`. Change both in every one of those files, or ArgoCD will
-cheerfully sync someone else's repository into your cluster.
+`bootstrap/root-app.yaml` and every file in `apps/` point at this repository's URL
+and branch `main`. Change both in every one of those files, or ArgoCD will happily
+sync my repository into your cluster.

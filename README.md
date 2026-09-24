@@ -1,8 +1,8 @@
 <h1 align="center">NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes</h1>
 
 <p align="center">
-  <b>Driver lifecycle · GPU health telemetry · Automated fault remediation</b>: taking a GPU node from bare instance to a production-stable, self-healing platform<br/>
-  GitOps-first · ArgoCD app-of-apps · declarative everything · reproducible from Git in minutes
+  <b>Driver lifecycle · GPU health telemetry · Fault remediation</b> on a rented NVIDIA L4, run from Git<br/>
+  kubeadm · ArgoCD app-of-apps · GPU Operator · DCGM · Prometheus
 </p>
 
 <p align="center">
@@ -11,37 +11,36 @@
 
 ---
 
-A rented NVIDIA L4 node taken from a bare cloud instance to a GitOps-managed,
-monitored, self-remediating GPU platform on upstream Kubernetes, then destroyed and
-rebuilt from Git. The driver and container toolkit are never touched by hand: they are
-pinned in a values file and rolled by a commit. GPU faults are detected from the kernel
-log, surfaced as node conditions, and acted on by a controller that cordons and drains
-without a human: that part is Session C and not built yet. Everything runs on one GPU node plus a small control plane, which is
-honest about being a scaled-down instance of a fleet method rather than a fleet.
+I rent an NVIDIA L4 on Scaleway by the hour, join it to a kubeadm cluster, and run it
+the way a fleet operator would: every component comes from this repository through
+ArgoCD, and nobody touches the node by hand. The NVIDIA driver and container toolkit
+are pinned in a values file, so upgrading the driver is a commit. When a session ends I
+destroy the GPU node, and the next session rebuilds it from Git.
 
-**What is simulated is stated plainly.** The GPU never actually failed. Session B injected
-an XID into DCGM to exercise alerting, and Session C will inject one as a kernel log line
-so the detection and remediation path downstream of it can be exercised for real. The full list is on the
-[What is simulated](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/simulated/) page,
-and nothing is left off it.
+It's one GPU and a small control plane, so it's a fleet method at small scale, not a
+fleet. I've kept a page listing
+[everything that's simulated](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/simulated/).
+The main item: the GPU never actually failed. In Session B I injected an XID into DCGM
+to test alerting, and Session C will write one into the kernel log to test detection
+and remediation.
 
 ## Build status
 
 | Session | Scope | Status |
 | --- | --- | --- |
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
-| B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a stated caveat, 2026-09-24 |
+| B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat I explain in the write-up, 2026-09-24 |
 | C | node-problem-detector, remediation controller, fault injection | Not started |
 | D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |
 
-## The four capabilities
+## What it covers
 
-| Capability | What it does | Built in |
+| Capability | What it does | Session |
 | --- | --- | --- |
-| **Driver and toolkit lifecycle** | NVIDIA GPU Operator with Node Feature Discovery, versions pinned in Git, driver bumps performed as a commit and rolled by ArgoCD | Session A |
-| **GPU health telemetry** | DCGM exporter with a custom counter set: SM utilisation, framebuffer, temperature, power, ECC counters, clock event reasons and XID. Prometheus alert rules that page on the signals that matter | Session B |
-| **Fault detection and remediation** | node-problem-detector reading `NVRM: Xid` from the kernel log into a node condition, and a Python controller that cordons, records an event, annotates and drains. Return to service is gated on `dcgmi diag`, never automatic | Session C |
-| **Goodput and acceptance** | A PyTorch job with checkpointing interrupted mid-training, with total, useful and lost time measured. A burn-in record. A cluster acceptance runbook with exit criteria | Session D |
+| **Driver and toolkit lifecycle** | NVIDIA GPU Operator with Node Feature Discovery. Versions pinned in Git; a driver upgrade is a commit that ArgoCD rolls out | A |
+| **GPU health telemetry** | DCGM exporter with a custom counter set (utilisation, SM and tensor activity, framebuffer, temperature, power, ECC, row remapping, clock event reasons, XID) and Prometheus alert rules, each with a unit test | B |
+| **Fault detection and remediation** | node-problem-detector reads `NVRM: Xid` from the kernel log into a node condition. A Python controller cordons, records an event, annotates and drains. A node only returns to service after `dcgmi diag` passes | C, planned |
+| **Goodput and acceptance** | A PyTorch job with checkpointing, interrupted mid-training, with total, useful and lost time measured. A burn-in record and an acceptance runbook with exit criteria | D, planned |
 
 ## Repository layout
 
@@ -57,7 +56,7 @@ nvidia-gpu-fleet-poc/
 
 ## Quick start
 
-> Full verified prerequisites live in the
+> The verified prerequisites are in the
 > [tutorial](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/prerequisites/). In short:
 
 ```bash
@@ -69,21 +68,21 @@ make down               # drain, remove and destroy the GPU node
 make cost               # how long the GPU has been up and what it has cost
 ```
 
-## Cost control
+## Cost
 
-The GPU node is rented hourly and destroyed at the end of every session. Only the small
-control plane persists, so Prometheus history survives between sessions.
+The GPU node only exists during a session. The control plane stays up, which is also
+what keeps Prometheus history between sessions.
 
 | Item | Rate |
 | --- | --- |
 | Scaleway L4-1-24G, 1x L4 24 GB | EUR 0.79/h, up only during a session |
 | Control plane, 4 vCPU / 8 GB | about EUR 0.04/h |
 
-## Secrets hygiene
+## Secrets
 
-All credentials come from a gitignored `.env`. Nothing secret is committed, printed to
-logs, or published. The site contains zero secrets. The node join token is created on
-demand by the control plane and expires; it is never stored in Git.
+Credentials live in a gitignored `.env` and never reach Git, logs or the published site.
+The node join token is created on demand by the control plane and expires; it isn't
+stored anywhere.
 
 ## Stack
 
@@ -98,10 +97,10 @@ demand by the control plane and expires; it is never stored in Git.
 ![Helm](https://img.shields.io/badge/Helm-0F1689?logo=helm&logoColor=white)
 ![Scaleway](https://img.shields.io/badge/Scaleway-4F0599?logo=scaleway&logoColor=white)
 
-## Connect
+## Contact
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://linkedin.com/in/yassine-teimi)
 [![Email](https://img.shields.io/badge/Email-EA4335?logo=gmail&logoColor=white)](mailto:yteimi@gmail.com)
 
 ---
-<p align="center"><sub>A reproducible method for operating GPU clusters on upstream Kubernetes. Independent work, not affiliated with or endorsed by any vendor named here.</sub></p>
+<p align="center"><sub>Independent work, not affiliated with or endorsed by any vendor named here.</sub></p>

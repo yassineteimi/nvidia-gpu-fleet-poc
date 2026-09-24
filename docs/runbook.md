@@ -1,13 +1,13 @@
 # Cluster acceptance runbook
 
 !!! info "Status: skeleton"
-    The structure and the check order are fixed. Each check gets its real command,
-    its real expected output and its real failure path filled in during Session D,
-    from a cluster that actually ran them.
+    The structure and the order of checks are settled. In Session D each check gets
+    its command, expected output and failure path, taken from a cluster that ran
+    them.
 
-From hardware handover to first production workload. Every check has a command, an
-expected result, and what to do when it fails. Work top to bottom and do not skip:
-the order exists because a failure high in the list makes everything below it
+Covers the path from hardware handover to the first production workload. Each check
+will have a command, an expected result and what to do when it fails. Work top to
+bottom without skipping: a failure high on the list makes everything below it
 meaningless.
 
 ## Exit criteria
@@ -44,5 +44,7 @@ The cluster is accepted when all of the following are true.
 
 ## XID decode table
 
-To be filled in during Session D: the codes an operator meets in practice, what each
-one means, and whether the correct response is retry, drain, or return the hardware.
+Planned for Session D: the codes an operator actually meets, what each one means, and
+whether the right response is to retry, drain, or send the hardware back. The split
+between application errors and GPU faults will follow the device plugin's list in
+[Findings](findings.md#the-device-plugin-already-decides-which-xids-mean-a-broken-gpu).

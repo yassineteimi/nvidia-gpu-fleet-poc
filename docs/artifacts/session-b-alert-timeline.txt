@@ -1,0 +1,7 @@
+DCGMExporterDown  pending  first=2026-09-24T13:13:48Z  last=2026-09-24T13:14:33Z  xid=-
+DCGMExporterRestarting  firing  first=2026-09-24T13:15:18Z  last=2026-09-24T13:29:03Z  xid=-
+GPUPowerThrottling  firing  first=2026-09-24T13:41:18Z  last=2026-09-24T13:45:33Z  xid=-
+GPUPowerThrottling  pending  first=2026-09-24T13:26:18Z  last=2026-09-24T13:41:03Z  xid=-
+GPUUtilisationCollapse  firing  first=2026-09-24T13:47:03Z  last=2026-09-24T13:53:18Z  xid=-
+GPUUtilisationCollapse  pending  first=2026-09-24T13:46:03Z  last=2026-09-24T13:46:48Z  xid=-
+GPUXidCritical  firing  first=2026-09-24T13:50:33Z  last=2026-09-24T13:53:18Z  xid=79

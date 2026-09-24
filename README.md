@@ -16,14 +16,23 @@ monitored, self-remediating GPU platform on upstream Kubernetes, then destroyed 
 rebuilt from Git. The driver and container toolkit are never touched by hand: they are
 pinned in a values file and rolled by a commit. GPU faults are detected from the kernel
 log, surfaced as node conditions, and acted on by a controller that cordons and drains
-without a human. Everything runs on one GPU node plus a small control plane, which is
+without a human: that part is Session C and not built yet. Everything runs on one GPU node plus a small control plane, which is
 honest about being a scaled-down instance of a fleet method rather than a fleet.
 
-**What is simulated is stated plainly.** The GPU never actually failed. The XID error is
-injected as a kernel log line so the detection and remediation path downstream of it can
-be exercised for real. The full list is on the
+**What is simulated is stated plainly.** The GPU never actually failed. Session B injected
+an XID into DCGM to exercise alerting, and Session C will inject one as a kernel log line
+so the detection and remediation path downstream of it can be exercised for real. The full list is on the
 [What is simulated](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/simulated/) page,
 and nothing is left off it.
+
+## Build status
+
+| Session | Scope | Status |
+| --- | --- | --- |
+| A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
+| B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a stated caveat, 2026-09-24 |
+| C | node-problem-detector, remediation controller, fault injection | Not started |
+| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |
 
 ## The four capabilities
 
@@ -41,9 +50,9 @@ nvidia-gpu-fleet-poc/
 ├── docs/          # the published GitHub Pages site (MkDocs Material)
 ├── terraform/     # both nodes, cloud-init, private network
 ├── gitops/        # ArgoCD app-of-apps: Applications, Helm values, manifests
-├── controllers/   # gpu-remediator, Python on the Kubernetes client
-├── workloads/     # CUDA acceptance pod, PyTorch training job, goodput analysis
-└── scripts/       # gpu-up, gpu-down, inject-xid, return-to-service, burn-in
+├── controllers/   # gpu-remediator, Python on the Kubernetes client (Session C, not yet built)
+├── workloads/     # CUDA acceptance pods; PyTorch training job and goodput analysis in Session D
+└── scripts/       # gpu-up, gpu-down, acceptance, Session B load and capture; fault injection and burn-in come with C and D
 ```
 
 ## Quick start

@@ -426,6 +426,10 @@ were ready and crash looped until they were, but that is a reading, not a findin
 the restart reasons were not captured. DCGM telemetry is the whole of Session B, so
 this is left open for it rather than explained away here.
 
+Session B answered it: the exporter starts before the standalone DCGM host engine
+accepts connections, exits, and is restarted until it does. The captured log is in
+[Session B](02-observability.md#the-exporter-restarts-explained).
+
 What nouveau did during the driver install is not in the captured log lines. What
 is established is the before and after: nouveau was loaded and attached to the L4 at
 first boot, and afterwards the L4 was served by the NVIDIA driver `595.91.07`.

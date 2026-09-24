@@ -102,6 +102,14 @@ bug and nobody tested it: in Session B the injected XID 79 fired the alert, the
 stayed flat at 0. So did the clock events panel, for a power cap that was on for twenty
 minutes. Both panels now plot the cumulative count.
 
+**The DCGM exporter's restarts at startup are the standalone host engine.** Session A
+saw three restarts and could only guess why. Session B kept the previous container's
+log: `Failed to connect to remote hostengine at nvidia-dcgm:5555`, exit code 1. With
+`dcgm.enabled: true` the exporter is a client of a separate host engine pod, starts
+without waiting for it, and crash loops until it answers. Harmless, because the
+restarts are the recovery, but it is the price of standalone DCGM, and an alert on
+exporter restarts has to tolerate a couple at every node start.
+
 **`increase()` also counts restarts that did not happen.** The same function has the
 opposite problem on a counter that is born partway through the window, and this
 one was found live rather than on paper. In Session B the DCGM exporter restarted exactly twice

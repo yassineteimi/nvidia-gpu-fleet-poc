@@ -2,7 +2,7 @@
 #
 # Real GPU load for Session B, and a real kill.
 #
-#   scripts/load.sh start    tensor load on the GPU for LOAD_SECONDS (default 1200)
+#   scripts/load.sh start    tensor load on the GPU for LOAD_SECONDS (default 3600)
 #   scripts/load.sh stop     kill it, which is what GPUUtilisationCollapse detects
 #   scripts/load.sh status
 #
@@ -27,7 +27,11 @@ require_tools kubectl
 require_kubeconfig
 
 DCGM_IMAGE="${DCGM_IMAGE:-nvcr.io/nvidia/cloud-native/dcgm:4.6.0-1-ubuntu24.04}"
-LOAD_SECONDS="${LOAD_SECONDS:-1200}"
+# An hour, far longer than anyone waits before make load-stop. In Session B
+# the default was twenty minutes, the stop came about fifteen seconds after the
+# job had already finished on its own, and the "kill" hit a completed job. The
+# alert saw the same drop either way, but a kill should be a kill.
+LOAD_SECONDS="${LOAD_SECONDS:-3600}"
 NS="gpu-load"
 JOB="gpu-load"
 TIMELINE="$REPO_ROOT/docs/artifacts/session-b-load-timeline.txt"
@@ -102,7 +106,11 @@ YAML
   stop)
     kubectl_cp -n "$NS" get job "$JOB" >/dev/null 2>&1 || die "no load job to kill"
     kubectl_cp -n "$NS" logs job/"$JOB" --tail=20 2>/dev/null | tee "$REPO_ROOT/docs/artifacts/session-b-load-job.txt" || true
-    echo "load_killed=$(now)" | tee -a "$TIMELINE"
+    # Record whether there was still something to kill. Running means a kill,
+    # Succeeded means the load had already ended on its own.
+    phase="$(kubectl_cp -n "$NS" get pod -l job-name="$JOB" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)"
+    echo "load_killed=$(now) phase_at_kill=${phase:-unknown}" | tee -a "$TIMELINE"
+    [ "$phase" = "Running" ] || log "WARNING: the load was $phase, not Running. This stop did not kill a running job"
     kubectl_cp -n "$NS" delete job "$JOB" --grace-period=0 --wait=false
     log "killed. GPUUtilisationCollapse should go pending within about three minutes and fire a minute later"
     ;;

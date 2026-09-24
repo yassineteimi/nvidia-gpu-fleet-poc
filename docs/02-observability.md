@@ -1,6 +1,6 @@
 # Session B: observability and XID alerting
 
-!!! info "Status: B1 written, not yet deployed"
+!!! info "Status: B1 deployed, B2 not yet run"
     This chapter is written during the session, from output captured live, not
     reconstructed afterwards. Until the session has run, this page states the plan,
     the decisions behind it and the acceptance test only. Nothing is claimed here
@@ -92,8 +92,7 @@ say how.
 
 ### B1, authoring
 
-Status: **written, not yet deployed**. Everything below exists in the repository.
-None of it has run against the cluster.
+Status: **done**. Written and checked before anything reached the cluster.
 
 | Piece | Where | Checked how, before any cluster saw it |
 |---|---|---|
@@ -113,8 +112,81 @@ the moment ArgoCD syncs. The other two are what B2 is for.
 
 ### B1, on the cluster
 
-Status: **not yet run**.
+Status: **done**. Deployed without a GPU node in the cluster.
+
+In the order the waves were written for: `make argocd` first, so ArgoCD would assess
+the health of Application resources, and only then the commit onto `main`, which
+ArgoCD watches. Deploying the stack before the health check would have run it
+under exactly the creation-only ordering it was written to avoid.
+
+```{ .sh .terminal }
+$ kubectl -n argocd get applications.argoproj.io
+NAME                     SYNC STATUS   HEALTH STATUS
+gpu-observability        Synced        Healthy
+gpu-operator             Synced        Healthy
+kube-prometheus-stack    Synced        Healthy
+local-path-provisioner   Synced        Healthy
+node-feature-discovery   Synced        Healthy
+root                     Synced        Healthy
+```
+
+All four new or changed Applications synced first time: storage, the monitoring
+stack, the GPU Operator with its new counter set, and the rules and dashboard. That
+answers the one thing B1 could not check from where it was written, whether the
+charts render with these values.
+
+```{ .sh .terminal }
+$ kubectl -n monitoring get pods,pvc
+NAME                                                            READY   STATUS    RESTARTS   AGE
+pod/alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running   0          2m41s
+pod/kube-prometheus-stack-grafana-74ccfb594b-lxdqs              3/3     Running   0          56s
+pod/kube-prometheus-stack-kube-state-metrics-84f8496f5c-8kmbq   1/1     Running   0          2m49s
+pod/kube-prometheus-stack-operator-5b5dcc8f66-pdbvl             1/1     Running   0          2m49s
+pod/kube-prometheus-stack-prometheus-node-exporter-28d9r        1/1     Running   0          2m49s
+pod/prometheus-kube-prometheus-stack-prometheus-0               2/2     Running   0          2m40s
+
+NAME                                                                                                   STATUS   CAPACITY   STORAGECLASS
+persistentvolumeclaim/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0   Bound    25Gi       local-path
+```
+
+The claim's `VOLUME`, `ACCESS MODES`, `VOLUMEATTRIBUTESCLASS` and `AGE` columns are
+left out for width. Prometheus has its 25 Gi volume, bound through the local-path
+class, which is the piece that lets GPU metrics outlive the GPU node.
+
+### The free check on the DCGM image
+
+Status: **two of three answered, one inconclusive**
+([`session-b-dcgm-image-check.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-dcgm-image-check.txt)).
+
+The DCGM image the GPU Operator runs, `nvcr.io/nvidia/cloud-native/dcgm:4.6.0-1-ubuntu24.04`,
+was run on the control plane with no GPU:
+
+```{ .sh .terminal }
+== dcgmproftester binaries
+/usr/bin/dcgmproftester12
+/usr/bin/dcgmproftester13
+...
+== dcgmi test --help (injection)
+   dcgmi test --host <IP/FQDN> --inject --gpuid <gpuId> -f <fieldId> -v
+      --inject                Inject values into cache.
+```
+
+`dcgmproftester` is in the image, in a CUDA 12 and a CUDA 13 build, and `dcgmi test`
+supports `--inject`. B2 can generate real load without pulling another image, and
+the simulated XID is possible.
+
+The first version of the check also reported `FAIL  --no-dcgm-validation not found
+in its help`. That result was wrong, and the fault was in the check, not the image.
+Under both binaries the check printed nothing at all, not even the `-d` and `-t`
+flags that certainly exist, which means `--help` never ran. `dcgmproftester` links
+against `libcuda`, which only exists on a node with an NVIDIA driver, and the check
+piped the loader's error through `grep` and then read the empty result as a missing
+flag. The script now shows the unfiltered output and which libraries are missing,
+and reports that case as inconclusive. The flag itself is in DCGM's source, and the
+first `make load` on the GPU node settles it, with `make load` now checking the job
+twenty seconds in rather than letting a rejected flag cost ten minutes.
 
 ### B2, live
 
 Status: **not yet run**.
+

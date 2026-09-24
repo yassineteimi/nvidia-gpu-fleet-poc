@@ -75,7 +75,25 @@ spec:
               nvidia.com/gpu: 1
 YAML
     log "load job submitted, waiting for it to start on the GPU"
-    kubectl_cp -n "$NS" wait pod -l job-name="$JOB" --for=jsonpath='{.status.phase}'=Running --timeout=600s
+    kubectl_cp -n "$NS" wait pod -l job-name="$JOB" --for=condition=PodScheduled --timeout=120s >/dev/null
+    deadline=$(( $(date +%s) + 600 ))
+    phase=""
+    while [ "$(date +%s)" -lt "$deadline" ]; do
+      phase="$(kubectl_cp -n "$NS" get pod -l job-name="$JOB" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)"
+      case "$phase" in Running | Failed | Succeeded) break ;; esac
+      sleep 5
+    done
+
+    # This is the first time dcgmproftester runs anywhere with a driver: on the
+    # control plane it cannot start at all, for lack of libcuda. If it rejects
+    # its flags it exits at once, so look again after twenty seconds rather than
+    # finding out ten billed minutes later.
+    [ "$phase" = "Running" ] && sleep 20
+    phase="$(kubectl_cp -n "$NS" get pod -l job-name="$JOB" -o jsonpath='{.items[0].status.phase}' 2>/dev/null || true)"
+    kubectl_cp -n "$NS" logs job/"$JOB" --tail=15 2>/dev/null | tee "$REPO_ROOT/docs/artifacts/session-b-load-start.txt" || true
+    if [ "$phase" != "Running" ]; then
+      die "the load job is $phase, not Running, twenty seconds in. Its log is above and in docs/artifacts/session-b-load-start.txt"
+    fi
     mkdir -p "$(dirname "$TIMELINE")"
     echo "load_started=$(now) duration_requested_s=$LOAD_SECONDS" | tee -a "$TIMELINE"
     log "running. Leave it at least ten minutes, then: make load-stop"

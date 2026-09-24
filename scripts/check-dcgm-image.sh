@@ -51,8 +51,10 @@ spec:
           echo "== dcgmproftester binaries"; ls -1 /usr/bin/dcgmproftester* 2>&1
           for b in /usr/bin/dcgmproftester*; do
             [ -x "\$b" ] || continue
-            echo "== \$b --help (flags B2 uses)"
-            "\$b" --help 2>&1 | grep -E -- '--no-dcgm-validation|--target-max-value|-d,|--duration|-t,|--fieldId' | head -n 8
+            echo "== \$b: shared libraries it cannot find here"
+            ldd "\$b" 2>&1 | grep "not found" || echo "none"
+            echo "== \$b --help, first lines, unfiltered"
+            "\$b" --help 2>&1 | head -n 12
           done
           echo "== dcgmi test --help (injection)"
           dcgmi test --help 2>&1 | grep -E -- '--inject|--field|--value|--gpuid' | head -n 8
@@ -69,6 +71,17 @@ kubectl_cp delete namespace "$NS" --wait=false >/dev/null
 
 echo
 grep -q 'dcgmproftester[0-9]' "$OUT" && log "PASS  dcgmproftester is in the image" || warn "FAIL  no dcgmproftester: B2 needs another load generator"
-grep -q -- '--no-dcgm-validation' "$OUT" && log "PASS  it takes --no-dcgm-validation" || warn "FAIL  --no-dcgm-validation not found in its help"
+# dcgmproftester links against libcuda, which only exists where there is an
+# NVIDIA driver. On the control plane its --help cannot even start, so a flag
+# missing from its help here proves nothing either way. The first version of
+# this script piped that failure through grep and reported it as FAIL.
+if grep -q -- '--no-dcgm-validation' "$OUT"; then
+  log "PASS  it takes --no-dcgm-validation"
+elif grep -q 'libcuda.* not found' "$OUT"; then
+  warn "INCONCLUSIVE  dcgmproftester needs libcuda, which only exists on a GPU node."
+  warn "              Its flags are confirmed by the first make load in B2 instead."
+else
+  warn "FAIL  --help ran and does not mention --no-dcgm-validation"
+fi
 grep -q -- '--inject' "$OUT" && log "PASS  dcgmi test supports --inject" || warn "FAIL  no --inject: the simulated XID is off the table"
 log "saved to docs/artifacts/session-b-dcgm-image-check.txt"

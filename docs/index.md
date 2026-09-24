@@ -37,7 +37,7 @@ claimed until the session that produces it has actually run.
 | Session | Scope | Status |
 |---|---|---|
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
-| B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | In progress: monitoring stack written, not yet deployed |
+| B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | In progress: monitoring stack deployed, GPU session next |
 | C | node-problem-detector, remediation controller, fault injection | Not started |
 | D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |
 

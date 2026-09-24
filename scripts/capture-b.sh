@@ -90,10 +90,12 @@ missing=0
 while read -r metric; do
   n="$(query "count($metric)" | jq -r '.data.result[0].value[1] // "0"')"
   case "$metric" in
-    DCGM_EXP_XID_ERRORS_TOTAL | DCGM_EXP_CLOCK_EVENTS_TOTAL)
-      # These have one series per xid or per clock event reason, and a series
-      # only exists once its first event has happened. Absent is correct on a
-      # healthy GPU that has not throttled yet, not a missing counter.
+    DCGM_EXP_XID_ERRORS_TOTAL | DCGM_EXP_CLOCK_EVENTS_TOTAL | DCGM_FI_DEV_XID_ERRORS)
+      # The two EXP counters have one series per xid or per clock event reason,
+      # and a series only exists once its first event has happened. The raw
+      # XID field is blank in DCGM until the first XID since boot, and the
+      # exporter skips blank values, so it has no series either. Absent is
+      # correct on a healthy GPU, not a missing counter.
       if [ "$n" = "0" ]; then state="no series yet (created on first event)"; else state="present, $n series"; fi ;;
     *)
       if [ "$n" = "0" ]; then state="MISSING"; missing=$((missing + 1)); else state="present, $n series"; fi ;;

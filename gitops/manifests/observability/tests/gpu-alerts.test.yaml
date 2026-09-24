@@ -281,3 +281,18 @@ tests:
       - eval_time: 25m
         alertname: DCGMExporterRestarting
         exp_alerts: []
+
+  # The Session B regression. A pod, and so its restart counter, is born
+  # inside the window, then restarts twice within a minute. Evaluated at 9m,
+  # increase() over that series is 2.33 and the increase() version of this
+  # rule fired on two restarts, which is what it did live. Two is not more
+  # than two.
+  - name: exactly two quick restarts on a new pod do not fire
+    interval: 40s
+    input_series:
+      - series: 'kube_pod_container_status_restarts_total{namespace="gpu-operator", pod="nvidia-dcgm-exporter-b", container="nvidia-dcgm-exporter"}'
+        values: '_x10 0 1 2 2 2 2 2 2 2 2'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: DCGMExporterRestarting
+        exp_alerts: []

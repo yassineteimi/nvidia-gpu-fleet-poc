@@ -98,6 +98,20 @@ branch that fires on a series which exists now and did not five minutes ago. The
 unit tests include that case, and replacing the rule with the naive one makes
 that test fail, which was checked rather than assumed.
 
+**`increase()` also counts restarts that did not happen.** The same function has the
+opposite problem on a counter that is born partway through the window, and this
+one was found live rather than on paper. In Session B the DCGM exporter restarted exactly twice
+while the GPU node came up, and `DCGMExporterRestarting`, then written as
+`increase(kube_pod_container_status_restarts_total{...}[15m]) > 2`, fired. A restart
+counter belongs to a pod, so it starts inside the window, and `increase()`
+extrapolates from the samples it has towards the window's edges. Just after two
+quick restarts that gives about 2.3 rather than 2, for a few evaluations, and a rule
+with no `for:` fires on the first one. Reproduced offline with `promtool` before the
+rule was touched. The rule now uses `changes()`, which counts the steps that
+happened, and a regression test replays two quick restarts on a new pod: it passes
+with `changes()` and fails with `increase()` put back. The general point, for any
+small integer threshold: `increase()` is a rate estimate, not a count.
+
 **Which XIDs mean a broken GPU is already decided in code.** The list of XIDs that
 are application errors rather than GPU faults is a judgement call that is easy to
 write from memory and get subtly wrong. The NVIDIA device plugin the GPU Operator

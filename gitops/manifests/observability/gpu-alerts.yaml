@@ -187,8 +187,15 @@ spec:
 
         # Session A saw the exporter restart three times in its first minutes.
         # This makes a repeat visible instead of leaving it to be noticed.
+        #
+        # changes(), not increase(). In Session B this rule, then written with
+        # increase(), fired on exactly two restarts. A restart counter belongs
+        # to a pod, so it is born inside the window, and two quick restarts
+        # right after birth leave increase() extrapolating to 2.33 for a few
+        # seconds, which is over the threshold. A rule with no for: fires in
+        # those seconds. changes() counts the steps that happened.
         - alert: DCGMExporterRestarting
-          expr: increase(kube_pod_container_status_restarts_total{namespace="gpu-operator", pod=~"nvidia-dcgm-exporter-.*"}[15m]) > 2
+          expr: changes(kube_pod_container_status_restarts_total{namespace="gpu-operator", pod=~"nvidia-dcgm-exporter-.*"}[15m]) > 2
           labels:
             severity: warning
           annotations:

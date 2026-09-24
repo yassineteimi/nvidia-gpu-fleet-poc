@@ -34,9 +34,8 @@ retry() {
 #
 # apt 2.4 and later, on both Jammy and Noble, takes DPkg::Lock::Timeout, which
 # blocks properly rather than guessing. Disabling unattended-upgrades would also
-# work and is what a lot of
-# provisioning scripts do, but a node that declines security updates to save two
-# minutes is not a node worth demonstrating.
+# work and is what a lot of provisioning scripts do, but a node that declines
+# security updates to save two minutes is not a node worth demonstrating.
 apt_get() {
   DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=300 "$@"
 }

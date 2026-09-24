@@ -20,7 +20,9 @@ fi
 printf '\n  %-22s %-22s %8s  %10s\n' "started" "ended" "duration" "cost"
 printf '  %s\n' "--------------------------------------------------------------------"
 
-awk -F, \
+# LC_ALL=C keeps the decimal point a point. awk follows the locale, so on a
+# machine set to French it printed 0,39 h beside EUR 0.79/h on the same line.
+LC_ALL=C awk -F, \
   -v gpu_rate="$GPU_HOURLY_EUR" \
   -v now="$(date -u +%s)" '
   function to_epoch(ts,   cmd, out) {

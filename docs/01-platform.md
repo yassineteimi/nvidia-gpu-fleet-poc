@@ -1,9 +1,11 @@
 # Session A: platform and GPU lifecycle
 
-!!! info "Status: not yet run"
-    This chapter is written during the session, from output captured live, not
-    reconstructed afterwards. Until the session has run, this page states the plan
-    and the acceptance test only. Nothing is claimed here that has not happened.
+!!! success "Status: done, acceptance test passed on 2026-09-24"
+    Every criterion below passed on a real L4. The NVIDIA driver on the node is
+    `595.91.07`, the version pinned in Git, installed by the GPU Operator onto an
+    image that had no NVIDIA driver at first boot. This chapter was written from
+    output captured live, which is committed under `docs/artifacts/`, not
+    reconstructed afterwards.
 
 ## Scope
 
@@ -131,14 +133,15 @@ answers it, rather than quietly fixed:
 - ~~Whether NFD produces `pci-10de.present` or `pci-0300_10de.present`.~~
   **Answered: the vendor only form.** Confirmed on a virtio NIC before any GPU
   existed, which made it free.
-- Whether `PLAY2-MICRO` is offered in `fr-par-2` at 4 vCPU and 8 GB, and what the root
-  volume type constraint is for it and for `L4-1-24G`. **Half answered**: the control
-  plane provisioned with `sbs_volume`, so that half holds. The L4 is untested.
+- ~~Whether `PLAY2-MICRO` is offered in `fr-par-2` at 4 vCPU and 8 GB, and what the
+  root volume type constraint is for it and for `L4-1-24G`.~~ **Answered: both run on
+  `sbs_volume`.** The L4's root volume came up as a 150 GB SBS volume at 5000 IOPS.
 - A question nobody wrote down, answered by the first `make up`: **Scaleway does not
-  offer plain Ubuntu on the L4 at all.** The GPU node now boots `kapsule_noble`,
-  which the second `make up` confirmed the L4 accepts. Whether that image arrives
-  carrying Kubernetes components that clash with kubeadm is the new open question,
-  and the bootstrap's image inventory will answer it.
+  offer plain Ubuntu on the L4 at all.** The GPU node now boots `kapsule_noble`.
+- ~~Whether `kapsule_noble` arrives carrying Kubernetes components that clash with
+  kubeadm.~~ **Answered: it carries nothing to clash with.** No container runtime,
+  no Kubernetes packages, no NVIDIA driver. Its root volume is named
+  `k8s_base_node_instance_sbs_volume_0`, which says what Scaleway built it for.
 - Another nobody wrote down, answered by the second `make up`: **the L4 quota is
   zero until the Organization's identity is verified.** Blocked on the account, not
   the code. See [Prerequisites](prerequisites.md).
@@ -151,11 +154,10 @@ answers it, rather than quietly fixed:
 
 ## What happened
 
-!!! warning "In progress, partial"
-    The control plane and ArgoCD are up, and three of the four open questions below
-    are closed without a GPU ever having been rented. The GPU node has not been
-    provisioned, so everything from the join onward is still unwritten. Sections
-    marked "not yet run" are exactly that, and nothing is filled in from memory.
+In two parts. On 2026-09-22 the control plane and the GitOps layer came up, and most
+of the open questions were answered with no GPU ever rented. On 2026-09-24 the GPU
+node was created, joined, given its driver by the GPU Operator, passed the
+acceptance test and was destroyed again, in one 0.39 hour session.
 
 ### Control plane and GitOps bootstrap
 
@@ -312,10 +314,262 @@ The same dump confirms the node is what Terraform was asked for:
 No `nvidia.com/*` labels, correctly: GPU Feature Discovery ships inside the GPU
 Operator and has no GPU to describe yet.
 
-### GPU node, join and driver
+### Getting an L4 at all
 
-Status: **not yet run**.
+Status: **done**, at the third attempt, with no GPU billed for the first two.
+
+The first `make up` failed on the image: Scaleway does not offer plain Ubuntu on GPU
+instance types. The second got past the image and failed on quota: `L4-1-24G` is
+zero until the Organization's identity is verified. Both are written up in
+[Findings](findings.md), and both cost nothing, because each failed before any
+server existed. The third created the node.
+
+### GPU node: what the image brought, and what it did not
+
+Status: **done**.
+
+The bootstrap records the image as it arrived, before changing anything
+([`session-a-gpu-image-inventory.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-a-gpu-image-inventory.txt)):
+
+```{ .sh .terminal }
+== os
+Ubuntu 24.04.4 LTS - 2026-09-09 - df5effdf
+6.8.0-136-generic
+== binaries
+nvidia-smi   absent
+containerd   absent
+runc         absent
+kubelet      absent
+kubeadm      absent
+kubectl      absent
+docker       absent
+crictl       absent
+== packages
+none of interest
+== units
+none of interest
+== kernel modules
+nouveau              3096576  0
+```
+
+`kapsule_noble` is a bare Ubuntu 24.04. Despite being built for Scaleway's managed
+Kubernetes, it arrives with no container runtime and no Kubernetes packages, so
+there was nothing for kubeadm to clash with. It also arrives with no NVIDIA driver.
+What it does have is `nouveau`, the in-kernel open source driver, loaded and
+attached to the L4. Everything NVIDIA on this node from this point on came from the
+GPU Operator.
+
+The L4 was visible on the PCI bus from the first boot:
+
+```{ .sh .terminal }
+01:00.0 3D controller [0302]: NVIDIA Corporation AD104GL [L4] [10de:27b8] (rev a1)
+```
+
+`[0302]` is the 3D controller class and `10de` the NVIDIA vendor ID, which are the
+two values the NFD configuration from wave 0 was written to turn into a label.
+
+### Join, label, driver
+
+Status: **done**.
+
+`gpu-up.sh` asked the control plane for a join command with a 30 minute token, ran
+it on the node, and the node came up Ready. NFD labelled it exactly as the operator
+needed:
+
+```{ .sh .terminal }
+$ kubectl get nodes -L feature.node.kubernetes.io/pci-10de.present
+NAME               STATUS   ROLES           AGE   VERSION   PCI-10DE.PRESENT
+gpu-fleet-cp-01    Ready    control-plane   41h   v1.36.4
+gpu-fleet-gpu-01   Ready    <none>          6m2s  v1.36.4   true
+```
+
+With that label present, the GPU Operator's DaemonSets finally had a node to match.
+The driver container built the pinned driver against the node's own kernel
+([`session-a-driver-install.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-a-driver-install.txt)):
+
+```{ .sh .terminal }
+Starting installation of NVIDIA driver version 595.91.07 for Linux kernel version 6.8.0-136-generic
+Installing Linux kernel headers...
+Installing Linux kernel module files...
+Done, now waiting for signal
+```
+
+The whole operator stack then came up on the GPU node
+([`session-a-gpu-operator-pods.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-a-gpu-operator-pods.txt)):
+
+```{ .sh .terminal }
+NAME                                       READY   STATUS      RESTARTS      AGE   NODE
+gpu-feature-discovery-mvd5b                1/1     Running     0             14m   gpu-fleet-gpu-01
+gpu-operator-6cd4764cbf-4t72b              1/1     Running     0             41h   gpu-fleet-cp-01
+nvidia-container-toolkit-daemonset-knqhl   1/1     Running     0             14m   gpu-fleet-gpu-01
+nvidia-cuda-validator-vfqd6                0/1     Completed   0             12m   gpu-fleet-gpu-01
+nvidia-dcgm-exporter-n2wmw                 1/1     Running     3 (11m ago)   14m   gpu-fleet-gpu-01
+nvidia-dcgm-qbvcv                          1/1     Running     0             14m   gpu-fleet-gpu-01
+nvidia-device-plugin-daemonset-b65gc       1/1     Running     0             14m   gpu-fleet-gpu-01
+nvidia-driver-daemonset-wml6j              1/1     Running     0             14m   gpu-fleet-gpu-01
+nvidia-operator-validator-jx89f            1/1     Running     0             14m   gpu-fleet-gpu-01
+```
+
+The `IP`, `NOMINATED NODE` and `READINESS GATES` columns are left out here for
+width. The artifact has them unedited.
+
+Two things in that list are worth more than a glance.
+
+The operator itself is 41 hours old and runs on the control plane. It was deployed
+by ArgoCD on 2026-09-22 and sat idle for two days with nothing to manage, then
+reacted to a GPU node appearing without anyone touching it. That is the GitOps
+claim, observed rather than asserted.
+
+`nvidia-dcgm-exporter` restarted three times in its first few minutes and has been
+stable since. The likeliest reading is that it started before DCGM and the driver
+were ready and crash looped until they were, but that is a reading, not a finding:
+the restart reasons were not captured. DCGM telemetry is the whole of Session B, so
+this is left open for it rather than explained away here.
+
+What nouveau did during the driver install is not in the captured log lines. What
+is established is the before and after: nouveau was loaded and attached to the L4 at
+first boot, and afterwards the L4 was served by the NVIDIA driver `595.91.07`.
+
+### GPU Feature Discovery, and the third NFD setting
+
+Status: **done**.
+
+Once the driver was in, GPU Feature Discovery described the GPU in labels
+([`session-a-gpu-node.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-a-gpu-node.txt)).
+A selection:
+
+| Label | Value |
+|---|---|
+| `nvidia.com/gpu.product` | `NVIDIA-L4` |
+| `nvidia.com/gpu.family` | `ada-lovelace` |
+| `nvidia.com/gpu.compute.major` / `.minor` | `8` / `9` |
+| `nvidia.com/gpu.memory` | `23034` |
+| `nvidia.com/gpu.machine` | `SCW-L4-1-24G` |
+| `nvidia.com/cuda.driver-version.full` | `595.91.07` |
+| `nvidia.com/cuda.runtime-version.full` | `13.2` |
+| `nvidia.com/mig.capable` | `false` |
+| `nvidia.com/gpu.sharing-strategy` | `none` |
+| `nvidia.com/gpu-driver-upgrade-state` | `upgrade-done` |
+
+That these labels exist at all is the confirmation of the last of the three NFD
+settings described in [Findings](findings.md). GPU Feature Discovery publishes into
+the `nvidia.com` namespace, which NFD's master refuses unless told otherwise by
+`extraLabelNs: [nvidia.com]`. The vendor-only PCI label was proven on a virtio NIC two
+days earlier. This proves the rest.
+
+`mig.capable: false` confirms that disabling the MIG manager in
+`gitops/values/gpu-operator.yaml` was right for an L4, and `sharing-strategy: none`
+is the baseline that time slicing will change in Session D.
 
 ### CUDA acceptance test
 
-Status: **not yet run**.
+Status: **passed**.
+
+`make acceptance` checks each criterion from the top of this page and writes what it
+saw to `docs/artifacts/` as it goes.
+
+```{ .sh .terminal }
+$ make acceptance
+...
+[Vector addition of 50000 elements]
+Copy input data from the host memory to the CUDA device
+CUDA kernel launch with 196 blocks of 256 threads
+Copy output data from the CUDA device to the host memory
+Test PASSED
+Done
+...
+Thu Sep 24 07:45:46 2026
++-----------------------------------------------------------------------------------------+
+| NVIDIA-SMI 595.91.07              Driver Version: 595.91.07      CUDA Version: 13.2     |
++-----------------------------------------+------------------------+----------------------+
+| GPU  Name                 Persistence-M | Bus-Id          Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp   Perf          Pwr:Usage/Cap |           Memory-Usage | GPU-Util  Compute M. |
+|                                         |                        |               MIG M. |
+|=========================================+========================+======================|
+|   0  NVIDIA L4                      On  |   00000000:01:00.0 Off |                    0 |
+| N/A   32C    P8             16W /   72W |       0MiB /  23034MiB |      0%      Default |
+|                                         |                        |                  N/A |
++-----------------------------------------+------------------------+----------------------+
+
++-----------------------------------------------------------------------------------------+
+| Processes:                                                                              |
+|  GPU   GI   CI              PID   Type   Process name                        GPU Memory |
+|        ID   ID                                                               Usage      |
+|=========================================================================================|
+|  No running processes found                                                             |
++-----------------------------------------------------------------------------------------+
+
+  PASS  node advertises nvidia.com/gpu: 1
+  PASS  node carries pci-10de.present=true
+  PASS  cuda-vectoradd printed Test PASSED
+  PASS  nvidia-smi sees the L4
+  PASS  driver in use is 595.91.07, the version pinned in Git
+  PASS  image had no NVIDIA driver at first boot (session-a-gpu-image-inventory.txt)
+
+==> acceptance test PASSED. Evidence is in docs/artifacts/session-a-*.txt
+```
+
+The fifth line is the one this project exists for. The driver check does not look
+for "an NVIDIA driver", it reads the version string out of
+`gitops/values/gpu-operator.yaml` and requires `nvidia-smi` to report that exact
+string. Read alongside the sixth, it says: this node booted without a driver, and
+the driver it is running now is the one a commit asked for.
+
+`CUDA Version: 13.2` is what the driver supports. The test images are CUDA 12.5 and
+12.6 on an Ubuntu 22.04 userland, running on a 24.04 host, which is fine: containers
+bring their own libraries, and the toolkit injects the host's driver.
+
+### Teardown
+
+Status: **done**.
+
+`make down` cordoned the node, drained it, deleted the node object and destroyed the
+instance. The drain had one pod to evict, the completed CUDA validator. Everything
+else on the node belonged to a DaemonSet. The warning is one line in the original,
+wrapped here for width:
+
+```{ .sh .terminal }
+Warning: ignoring DaemonSet-managed Pods: gpu-operator/gpu-feature-discovery-mvd5b,
+  gpu-operator/nvidia-container-toolkit-daemonset-knqhl, gpu-operator/nvidia-dcgm-exporter-n2wmw,
+  gpu-operator/nvidia-dcgm-qbvcv, gpu-operator/nvidia-device-plugin-daemonset-b65gc,
+  gpu-operator/nvidia-driver-daemonset-wml6j, gpu-operator/nvidia-operator-validator-jx89f,
+  kube-flannel/kube-flannel-ds-89zgz, kube-system/kube-proxy-ng2dz,
+  node-feature-discovery/node-feature-discovery-worker-kpz8m
+evicting pod gpu-operator/nvidia-cuda-validator-vfqd6
+node/gpu-fleet-gpu-01 drained
+```
+
+This was the first live run of the plan guard in `scripts/lib.sh`, which refuses any
+GPU apply that would destroy or replace something other than the GPU node. It let
+this one through, correctly, because the plan touched nothing else:
+
+```{ .sh .terminal }
+Plan: 0 to add, 0 to change, 4 to destroy.
+...
+scaleway_instance_private_nic.gpu_node[0]: Destruction complete after 5s
+scaleway_ipam_ip.gpu_node[0]: Destruction complete after 1s
+scaleway_instance_server.gpu_node[0]: Destruction complete after 17s
+scaleway_instance_ip.gpu_node[0]: Destruction complete after 1s
+```
+
+This is the same cordon, drain and remove path the remediation controller takes in
+Session C when a GPU goes bad. It now has one real run behind it.
+
+### What the session cost
+
+| | |
+|---|---|
+| GPU session opened | 2026-09-24 07:28:16 UTC |
+| Acceptance test passed | 2026-09-24 07:45:46 UTC |
+| GPU session closed | 2026-09-24 07:51:45 UTC |
+| GPU time | 0.39 hours |
+| GPU cost at list price | EUR 0.31 |
+
+About 17 and a half minutes from `make up` to a passing acceptance test, including
+the human reading the output in between. The two earlier attempts on the same day
+failed before any server existed and cost nothing in GPU time. The GPU node's
+flexible IP and private IP reservation did exist from the first failed attempt, the
+evening before, until this teardown, which costs a fraction of a cent an hour and
+is not in the figure above. The control plane bills separately and continuously,
+at about EUR 0.04 an hour. Scaleway's console, not this table, is the authority on
+what was charged.

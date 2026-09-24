@@ -60,6 +60,12 @@ a label that never comes. Worth generalising: a configuration that decides wheth
 GPU scheduling works can often be tested against whatever hardware is already in the
 cluster, days before the expensive hardware shows up.
 
+**And the rest, confirmed on the L4 itself.** When the GPU node joined on 2026-09-24
+it was labelled `pci-10de.present=true`, and GPU Feature Discovery's `nvidia.com/*`
+labels appeared on it: product, family, compute capability, driver version. Those
+only exist because of `extraLabelNs: [nvidia.com]`, the third of the three
+settings, so all three are now proven on the hardware they were written for.
+
 ## During the build
 
 **Scaleway will not boot plain Ubuntu on a GPU instance.** The first `make up`
@@ -100,6 +106,11 @@ kubeadm, so it may arrive carrying its own container runtime or Kubernetes
 components. The bootstrap now records an inventory of what the image shipped
 before changing anything, and checks for a driver before installing anything, so
 a surprise costs one minute of L4 time rather than ten.
+
+In the event there was no surprise. The inventory showed a bare Ubuntu 24.04:
+no container runtime, no Kubernetes packages, no NVIDIA driver, only the in-kernel
+`nouveau` module attached to the L4. The GPU Operator built and loaded `595.91.07`
+onto it and the acceptance test passed. See [Session A](01-platform.md).
 
 With `kapsule_noble` the next `make up` got further, past image resolution, and
 stopped one step later on something no image choice fixes:

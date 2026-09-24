@@ -46,14 +46,99 @@ devicePlugin:
   enabled: true
 
 # DCGM and its exporter ship inside this chart rather than as a separate
-# deployment, which surprised me and is on the findings page. It is enabled by
-# default and the default counter set is missing most of what a Day 2 dashboard
-# needs, so Session B replaces the counters with a ConfigMap of its own.
+# deployment, which surprised me and is on the findings page.
+#
+# Standalone DCGM is a decision, not the chart's default. The default is
+# dcgm.enabled: false, with the exporter running the DCGM host engine embedded.
+# An earlier version of this comment read as though true were the default, and
+# it is not. The standalone host engine is kept because Session C gates a node's
+# return to service on dcgmi diag, which needs a running host engine to talk to.
+# It is also the leading suspect for the three restarts the exporter went
+# through in Session A: an exporter pointed at a remote host engine that is not
+# ready yet has nothing to connect to. Session B checks that rather than
+# assuming it.
 dcgm:
   enabled: true
 
 dcgmExporter:
   enabled: true
+
+  # The counter set, owned here rather than taken from the image.
+  #
+  # The operator mounts this ConfigMap into the exporter and points
+  # DCGM_EXPORTER_COLLECTORS at it (controllers/object_controls.go in the
+  # operator). It replaces the exporter's default set entirely, so everything
+  # wanted from the default set is listed again below.
+  #
+  # Every line is copied verbatim from etc/default-counters.csv in dcgm-exporter
+  # 4.6.0-4.8.3, the version this chart deploys, some of them uncommented. That
+  # is deliberate: an unknown field name stops the exporter from starting, and
+  # it would stop on a node billed by the hour.
+  #
+  # Added to the defaults: XID and clock event counters, ECC, power and thermal
+  # violations, SM activity and DCGM health status.
+  # Removed from the defaults: NVLink bandwidth and vGPU licence status. An L4
+  # has neither.
+  config:
+    name: gpu-fleet-dcgm-metrics
+    create: true
+    data: |-
+      # Utilisation
+      DCGM_FI_DEV_GPU_UTIL, gauge, GPU utilization (in %).
+      DCGM_FI_DEV_MEM_COPY_UTIL, gauge, Memory utilization (in %).
+      DCGM_FI_DEV_ENC_UTIL, gauge, Encoder utilization (in %).
+      DCGM_FI_DEV_DEC_UTIL, gauge, Decoder utilization (in %).
+
+      # Profiling. GPU_UTIL only says a kernel was running; these say how much
+      # of the chip it was using, which is the difference between busy and
+      # productive.
+      DCGM_FI_PROF_GR_ENGINE_ACTIVE, gauge, Ratio of time the graphics engine is active.
+      DCGM_FI_PROF_SM_ACTIVE, gauge, The ratio of cycles an SM has at least 1 warp assigned.
+      DCGM_FI_PROF_PIPE_TENSOR_ACTIVE, gauge, Ratio of cycles the tensor (HMMA) pipe is active.
+      DCGM_FI_PROF_DRAM_ACTIVE, gauge, Ratio of cycles the device memory interface is active sending or receiving data.
+      DCGM_FI_PROF_PCIE_TX_BYTES, counter, Total number of bytes transmitted through PCIe TX via NVML.
+      DCGM_FI_PROF_PCIE_RX_BYTES, counter, Total number of bytes received through PCIe RX via NVML.
+
+      # Memory
+      DCGM_FI_DEV_FB_FREE, gauge, Framebuffer memory free (in MiB).
+      DCGM_FI_DEV_FB_USED, gauge, Framebuffer memory used (in MiB).
+      DCGM_FI_DEV_FB_RESERVED, gauge, Framebuffer memory reserved (in MiB).
+
+      # Thermal and power
+      DCGM_FI_DEV_GPU_TEMP, gauge, GPU temperature (in C).
+      DCGM_FI_DEV_MEMORY_TEMP, gauge, Memory temperature (in C).
+      DCGM_FI_DEV_POWER_USAGE, gauge, Power draw (in W).
+      DCGM_FI_DEV_TOTAL_ENERGY_CONSUMPTION, counter, Total energy consumption since boot (in mJ).
+
+      # Clocks, and why they drop. The violation counters are in nanoseconds.
+      DCGM_FI_DEV_SM_CLOCK, gauge, SM clock frequency (in MHz).
+      DCGM_FI_DEV_MEM_CLOCK, gauge, Memory clock frequency (in MHz).
+      DCGM_FI_DEV_POWER_VIOLATION, counter, Throttling duration due to power constraints (in ns).
+      DCGM_FI_DEV_THERMAL_VIOLATION, counter, Throttling duration due to thermal constraints (in ns).
+      DCGM_EXP_CLOCK_EVENTS_TOTAL, counter, Total clock events observed since exporter start (edge-counted).
+
+      # Memory health
+      DCGM_FI_DEV_ECC_SBE_VOL_TOTAL, counter, Total number of single-bit volatile ECC errors.
+      DCGM_FI_DEV_ECC_DBE_VOL_TOTAL, counter, Total number of double-bit volatile ECC errors.
+      DCGM_FI_DEV_ECC_SBE_AGG_TOTAL, counter, Total number of single-bit persistent ECC errors.
+      DCGM_FI_DEV_ECC_DBE_AGG_TOTAL, counter, Total number of double-bit persistent ECC errors.
+      DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS, counter, Number of remapped rows for uncorrectable errors
+      DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS, counter, Number of remapped rows for correctable errors
+      DCGM_FI_DEV_ROW_REMAP_FAILURE, gauge, Whether remapping of rows has failed
+
+      # Bus
+      DCGM_FI_DEV_PCIE_REPLAY_COUNTER, counter, Total number of PCIe retries.
+
+      # XID and health. XID_ERRORS is the last XID seen and never resets, so it
+      # is kept for the dashboard only. Alerts use XID_ERRORS_TOTAL, a real
+      # counter with one series per xid label. It resets when the exporter
+      # restarts, which increase() handles, but an XID raised while the
+      # exporter is down is not counted at all.
+      DCGM_FI_DEV_XID_ERRORS, gauge, Value of the last XID error encountered.
+      DCGM_EXP_XID_ERRORS_TOTAL, counter, Total XID errors observed since exporter start.
+      DCGM_EXP_GPU_HEALTH_STATUS, gauge, Current DCGM-reported GPU health status.
+
+      DCGM_FI_DRIVER_VERSION, label, Driver Version
 
 # MIG is not available on an L4, so the manager has nothing to do here.
 migManager:

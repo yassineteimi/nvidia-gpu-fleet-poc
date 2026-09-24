@@ -21,10 +21,38 @@ configs:
     server.insecure: true
 
   cm:
-    # Ignore the fields the GPU Operator's own controllers write back into the
-    # resources it owns, so that a synced Application does not immediately drift.
+    # ClusterRoles built by aggregation have their rules filled in by the API
+    # server, not by the manifest, so without this they read as permanently out
+    # of sync. kube-prometheus-stack ships several.
     resource.compareoptions: |
       ignoreAggregatedRoles: true
+
+    # Health for Application resources, restored.
+    #
+    # ArgoCD stopped assessing the health of Application resources in 1.8. In an
+    # app of apps, that means sync waves between child Applications only order
+    # their creation: wave 1 is created the moment wave 0 is created, not once
+    # wave 0 is healthy. This repository's wave table assumed the second
+    # behaviour from Session A onward and was getting the first. It happened not
+    # to matter, because the GPU Operator waits for NFD's labels on its own. It
+    # matters from Session B, where the GPU Operator's ServiceMonitor needs the
+    # Prometheus CRDs from an earlier wave to actually exist.
+    #
+    # This is the check ArgoCD's own documentation gives for restoring it:
+    # docs/operator-manual/health.md, "Argocd App".
+    resource.customizations.health.argoproj.io_Application: |
+      hs = {}
+      hs.status = "Progressing"
+      hs.message = ""
+      if obj.status ~= nil then
+        if obj.status.health ~= nil then
+          hs.status = obj.status.health.status
+          if obj.status.health.message ~= nil then
+            hs.message = obj.status.health.message
+          end
+        end
+      end
+      return hs
 
 controller:
   replicas: 1

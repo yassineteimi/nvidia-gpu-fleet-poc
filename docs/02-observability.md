@@ -1,6 +1,6 @@
 # Session B: observability and XID alerting
 
-!!! info "Status: planned, not yet run"
+!!! info "Status: B1 written, not yet deployed"
     This chapter is written during the session, from output captured live, not
     reconstructed afterwards. Until the session has run, this page states the plan,
     the decisions behind it and the acceptance test only. Nothing is claimed here
@@ -90,4 +90,31 @@ say how.
 
 ## What happened
 
-To be filled in during Session B with real captured output.
+### B1, authoring
+
+Status: **written, not yet deployed**. Everything below exists in the repository.
+None of it has run against the cluster.
+
+| Piece | Where | Checked how, before any cluster saw it |
+|---|---|---|
+| Health checks for Application resources, so the waves below mean something | `gitops/bootstrap/argocd-values.yaml` | Copied from ArgoCD's documentation for v3.5.3 |
+| Storage, refusing volumes on the GPU node | `gitops/apps/local-path-provisioner.yaml`, `gitops/values/local-path-provisioner.yaml` | Every key present in the chart's own values at v0.0.37 |
+| kube-prometheus-stack, pinned to the control plane | `gitops/apps/kube-prometheus-stack.yaml`, `gitops/values/kube-prometheus-stack.yaml` | Every key present in the chart's values at 91.4.1, and in the Grafana 13.2.5 and kube-state-metrics 8.5.0 subcharts it pins |
+| 34 DCGM counters, owned in Git | `gitops/values/gpu-operator.yaml` | Every field name copied verbatim from dcgm-exporter 4.6.0-4.8.3's own counter file, and the ConfigMap wiring traced through the operator's chart template and controller |
+| 9 alert rules | `gitops/manifests/observability/gpu-alerts.yaml` | `promtool` 3.14.0, the Prometheus version the chart deploys: syntax, and 11 test cases making 25 alert evaluations. Four deliberate mutations of the rules each broke the test written for them |
+| The dashboard, 21 panels | `gitops/manifests/observability/dashboards/gpu-fleet.json` | All 34 queries parsed by `promtool`; every DCGM metric they read is in the counter set; `kustomize build` produces the ConfigMap with the sidecar's label |
+| The B2 scripts | `scripts/check-dcgm-image.sh`, `load.sh`, `inject-xid-dcgm.sh`, `capture-b.sh`, `grafana-ui.sh` | `shellcheck`. Every flag for `dcgmproftester` and `dcgmi test --inject` read from DCGM's source; field IDs 230 and 1004 from `dcgm_fields.h` |
+
+Not checked, because nothing here can check it: whether the charts render with
+these values (`helm` and the chart repositories are unreachable from where this was
+written), whether an injected value reaches the exporter's XID counter, and whether
+`dcgmproftester` runs on an L4 alongside a standalone DCGM. The first is answered
+the moment ArgoCD syncs. The other two are what B2 is for.
+
+### B1, on the cluster
+
+Status: **not yet run**.
+
+### B2, live
+
+Status: **not yet run**.

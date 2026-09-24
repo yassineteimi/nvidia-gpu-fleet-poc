@@ -1,0 +1,24 @@
+# The GPU fleet's own observability objects: alert rules and the dashboard.
+# Deployed by gitops/apps/gpu-observability.yaml. The tests/ directory is not
+# listed here on purpose; it is for promtool, not for the cluster.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: monitoring
+
+resources:
+  - gpu-alerts.yaml
+
+# The dashboard stays a plain JSON file, so it can be read, diffed and imported
+# into any Grafana by hand. This wraps it in a ConfigMap carrying the label the
+# Grafana sidecar watches for. No name suffix hash: the sidecar identifies a
+# dashboard by its uid, and a new ConfigMap name on every edit would only
+# leave the old one behind.
+configMapGenerator:
+  - name: gpu-fleet-dashboard
+    files:
+      - dashboards/gpu-fleet.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"

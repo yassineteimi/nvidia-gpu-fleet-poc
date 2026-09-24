@@ -68,6 +68,44 @@ settings, so all three are now proven on the hardware they were written for.
 
 ## During the build
 
+**ArgoCD sync waves between child Applications do not wait for anything by
+default.** This repository's wave table said Node Feature Discovery syncs in wave 0
+and the GPU Operator in wave 1, and the architecture page described that as an
+ordering. It was not one. ArgoCD stopped assessing the health of `Application`
+resources in version 1.8, and its own documentation says that anyone using waves
+across an app of apps has to restore that health check by hand. Without it, a
+later wave's Application is created the moment an earlier one is, healthy or not.
+Session A never noticed, because the GPU Operator waits for NFD's labels on its
+own, so the missing ordering happened not to matter. Session B would have
+noticed: the GPU Operator's ServiceMonitor needs the Prometheus CRDs from an
+earlier wave to exist, and nothing was making it wait for them.
+`gitops/bootstrap/argocd-values.yaml` now carries the health check, copied from
+[ArgoCD's documentation](https://github.com/argoproj/argo-cd/blob/v3.5.3/docs/operator-manual/health.md)
+for the version this cluster runs. Found by reading the documentation while
+planning Session B, not by a failure, which is the only reason this entry is not
+about a broken sync.
+
+**`increase()` cannot see the first XID.** dcgm-exporter 4.8.3's
+`DCGM_EXP_XID_ERRORS_TOTAL` is the right signal for XID alerts: a real counter, one
+series per `xid`, counting DCGM events since the exporter started. But a series for
+a given XID only comes into existence when that XID first happens, and it is born
+at 1. `increase()` needs two samples and sees a counter that starts at 1 and stays
+there as no increase at all, so the obvious rule,
+`increase(DCGM_EXP_XID_ERRORS_TOTAL[5m]) > 0`, stays silent for exactly the first
+fatal XID on a node, which is usually the only one there is before the node is
+lost. The rule in `gitops/manifests/observability/gpu-alerts.yaml` has a second
+branch that fires on a series which exists now and did not five minutes ago. The
+unit tests include that case, and replacing the rule with the naive one makes
+that test fail, which was checked rather than assumed.
+
+**Which XIDs mean a broken GPU is already decided in code.** The list of XIDs that
+are application errors rather than GPU faults is a judgement call that is easy to
+write from memory and get subtly wrong. The NVIDIA device plugin the GPU Operator
+deploys already makes it, in `internal/rm/health.go` at v0.20.0: 13, 31, 43, 45, 68
+and 109 are "application errors: the GPU should still be healthy", and any other
+XID marks the GPU unhealthy. The alert rules use the same line, so Prometheus and
+the scheduler cannot disagree about whether a GPU is broken.
+
 **Scaleway will not boot plain Ubuntu on a GPU instance.** The first `make up`
 failed before any GPU was billed:
 

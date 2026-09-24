@@ -30,22 +30,33 @@ a one line diff.
 
 | Wave | Component | Session |
 |---|---|---|
-| 0 | node-feature-discovery | A |
+| -1 | local-path-provisioner | B |
+| 0 | node-feature-discovery, kube-prometheus-stack | A, B |
 | 1 | gpu-operator | A |
-| 1 | kube-prometheus-stack | B |
-| 2 | Grafana dashboards, Prometheus alert rules | B |
+| 2 | gpu-observability: GPU alert rules and the Grafana dashboard | B |
 | 3 | node-problem-detector, gpu-remediator | C |
 | 4 | Tenant namespaces and quotas | D |
 
-Waves 2 to 4 do not exist yet. They are added by the session that builds them,
+Waves 3 and 4 do not exist yet. They are added by the session that builds them,
 not before.
 
-The ordering that matters today is 0 before 1: the GPU Operator selects nodes on
-labels that Node Feature Discovery produces, so an operator that syncs first
-finds nothing to do and stays that way.
+Three orderings matter. Storage before anything that asks for a volume.
+Node Feature Discovery before the GPU Operator, which selects nodes on NFD's
+labels. And kube-prometheus-stack before the GPU Operator, which is why it moved
+from wave 1 to wave 0 in Session B: the operator enables a ServiceMonitor for the
+DCGM exporter by default, and a ServiceMonitor only exists once the Prometheus
+Operator's CRDs do.
+
+> **Waves only order readiness because of a setting.** ArgoCD stopped assessing
+> the health of `Application` resources in version 1.8. Without it, waves between
+> child Applications in an app of apps only order their *creation*: wave 1 is
+> created the moment wave 0 is, not once wave 0 is healthy.
+> `bootstrap/argocd-values.yaml` restores the health check that ArgoCD's own
+> documentation gives for this. Session A ran without it, which is written up in
+> [Findings](../docs/findings.md).
 
 ## If you forked this
 
 `bootstrap/root-app.yaml` and every file in `apps/` name this repository by URL
-and reference branch `main`. Change both in all three places, or ArgoCD will
+and reference branch `main`. Change both in every one of those files, or ArgoCD will
 cheerfully sync someone else's repository into your cluster.

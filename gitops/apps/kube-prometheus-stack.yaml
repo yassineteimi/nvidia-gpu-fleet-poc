@@ -1,0 +1,53 @@
+# kube-prometheus-stack, sync wave 0.
+#
+# Wave 0 rather than the wave 1 first planned, beside Node Feature Discovery.
+# The GPU Operator enables a ServiceMonitor for the DCGM exporter by default,
+# and a ServiceMonitor can only exist once the Prometheus Operator's CRDs do,
+# which this chart installs. So it has to be ready before the GPU Operator in
+# wave 1 reconciles. That ordering is only real because gitops/bootstrap/
+# argocd-values.yaml restores health checks for Application resources.
+#
+# The CRDs are large enough to exceed the annotation size limit of a client
+# side apply, which is why ServerSideApply is not optional here.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://prometheus-community.github.io/helm-charts
+      chart: kube-prometheus-stack
+      targetRevision: 91.4.1
+      helm:
+        releaseName: kube-prometheus-stack
+        valueFiles:
+          - $values/gitops/values/kube-prometheus-stack.yaml
+
+    - repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

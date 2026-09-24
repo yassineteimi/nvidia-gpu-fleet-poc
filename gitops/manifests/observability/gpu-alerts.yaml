@@ -1,0 +1,198 @@
+# GPU fleet alert rules.
+#
+# Unit tested offline by tests/gpu-alerts.test.yaml. Run them with:
+#   make test-rules
+#
+# Every metric below comes from the DCGM exporter's counter set in
+# gitops/values/gpu-operator.yaml. Several are disabled in the exporter's default
+# set, so these rules depend on that file.
+#
+# Keep spec as the last top-level key: scripts/test-rules.sh lifts everything
+# under it into a plain Prometheus rules file for promtool.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: gpu-fleet
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/part-of: gpu-fleet-poc
+spec:
+  groups:
+    ########################################
+    # XID
+    #
+    # Which XIDs count as a GPU fault is not decided here. It is taken from the
+    # NVIDIA device plugin the GPU Operator deploys, v0.20.0,
+    # internal/rm/health.go, which treats 13, 31, 43, 45, 68 and 109 as
+    # application errors ("the GPU should still be healthy") and marks the GPU
+    # unhealthy for any other XID. These rules draw the same line, so
+    # Prometheus and the scheduler agree about what a GPU fault is.
+    #
+    # DCGM_EXP_XID_ERRORS_TOTAL has one series per xid, and a series only
+    # appears when its first XID happens, already at 1. increase() cannot see
+    # a counter's first increment when the series is born at a non zero value,
+    # so each rule has a second branch that fires on a series that exists now
+    # and did not exist five minutes ago. Without it the first fatal XID on a
+    # node would be the one that is missed.
+    #
+    # Two known blind spots, stated rather than hidden. The counter resets when
+    # the exporter restarts, and an XID raised while the exporter is down is
+    # not counted. And it is derived from DCGM, so an XID that DCGM never
+    # reports, XID 62 for one, is invisible to it. That is why Session C reads
+    # the kernel log and treats DCGM as corroboration.
+    ########################################
+    - name: gpu-fleet.xid
+      rules:
+        - alert: GPUXidCritical
+          expr: |
+            (
+              sum by (Hostname, gpu, UUID, xid) (
+                increase(DCGM_EXP_XID_ERRORS_TOTAL{xid!~"13|31|43|45|68|109"}[5m])
+              ) > 0
+            )
+            or
+            (
+              sum by (Hostname, gpu, UUID, xid) (DCGM_EXP_XID_ERRORS_TOTAL{xid!~"13|31|43|45|68|109"})
+              unless
+              sum by (Hostname, gpu, UUID, xid) (DCGM_EXP_XID_ERRORS_TOTAL{xid!~"13|31|43|45|68|109"} offset 5m)
+            )
+          labels:
+            severity: critical
+          annotations:
+            summary: "XID {{ $labels.xid }} on GPU {{ $labels.gpu }} of {{ $labels.Hostname }}"
+            description: >-
+              XID {{ $labels.xid }} is not on the NVIDIA device plugin's list of
+              application errors, so the device plugin will also have marked this
+              GPU unhealthy. Cordon the node and run dcgmi diag before returning
+              it to service.
+
+        - alert: GPUXidApplication
+          expr: |
+            (
+              sum by (Hostname, gpu, UUID, xid) (
+                increase(DCGM_EXP_XID_ERRORS_TOTAL{xid=~"13|31|43|45|68|109"}[5m])
+              ) > 0
+            )
+            or
+            (
+              sum by (Hostname, gpu, UUID, xid) (DCGM_EXP_XID_ERRORS_TOTAL{xid=~"13|31|43|45|68|109"})
+              unless
+              sum by (Hostname, gpu, UUID, xid) (DCGM_EXP_XID_ERRORS_TOTAL{xid=~"13|31|43|45|68|109"} offset 5m)
+            )
+          labels:
+            severity: warning
+          annotations:
+            summary: "Application XID {{ $labels.xid }} on GPU {{ $labels.gpu }} of {{ $labels.Hostname }}"
+            description: >-
+              XID {{ $labels.xid }} is an application error. The GPU is expected
+              to be healthy. A workload crashed or misbehaved on it.
+
+    ########################################
+    # Hardware health
+    ########################################
+    - name: gpu-fleet.health
+      rules:
+        - alert: GPUECCDoubleBitError
+          expr: increase(DCGM_FI_DEV_ECC_DBE_VOL_TOTAL[10m]) > 0
+          labels:
+            severity: critical
+          annotations:
+            summary: "Uncorrectable ECC error on GPU {{ $labels.gpu }} of {{ $labels.Hostname }}"
+            description: >-
+              A double bit ECC error cannot be corrected, and whatever was using
+              that memory may have read corrupted data.
+
+        - alert: GPURowRemapFailure
+          expr: DCGM_FI_DEV_ROW_REMAP_FAILURE > 0
+          labels:
+            severity: critical
+          annotations:
+            summary: "Row remapping failed on GPU {{ $labels.gpu }} of {{ $labels.Hostname }}"
+            description: >-
+              The GPU could not remap a failing memory row. It has run out of
+              spare rows or failed to use one, and needs to come out of service.
+
+        # The violation counters are in nanoseconds of throttling, so their rate
+        # is nanoseconds per second: 1e8 is 10 percent of the time. These
+        # thresholds are starting points, not tuned values. An L4 is a 72 W card
+        # that is expected to meet its power cap under sustained load, so the
+        # power threshold is deliberately higher than the thermal one.
+        - alert: GPUThermalThrottling
+          expr: rate(DCGM_FI_DEV_THERMAL_VIOLATION[5m]) > 1e8
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "GPU {{ $labels.gpu }} of {{ $labels.Hostname }} thermally throttled over 10% of the time"
+            description: >-
+              Clocks are being reduced for temperature. Check cooling before
+              trusting any benchmark or burn in figure from this node.
+
+        - alert: GPUPowerThrottling
+          expr: rate(DCGM_FI_DEV_POWER_VIOLATION[5m]) > 5e8
+          for: 15m
+          labels:
+            severity: info
+          annotations:
+            summary: "GPU {{ $labels.gpu }} of {{ $labels.Hostname }} power capped over half the time"
+            description: >-
+              Expected under sustained load on a power limited card. Worth knowing
+              when comparing performance, not a fault by itself.
+
+    ########################################
+    # Utilisation collapse
+    #
+    # A GPU that was busy for ten minutes and has now been idle for three. On
+    # this cluster that means a job died, was killed, or hung without holding
+    # the GPU busy. The acceptance test for Session B makes this fire on a real
+    # load job that is genuinely killed.
+    #
+    # Aggregated by GPU identity rather than by exporter pod, so an exporter
+    # restart between the two windows cannot fake or hide a collapse.
+    ########################################
+    - name: gpu-fleet.utilisation
+      rules:
+        - alert: GPUUtilisationCollapse
+          expr: |
+            avg by (Hostname, gpu, UUID) (avg_over_time(DCGM_FI_DEV_GPU_UTIL[10m] offset 3m)) > 50
+            and
+            max by (Hostname, gpu, UUID) (max_over_time(DCGM_FI_DEV_GPU_UTIL[3m])) < 5
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "GPU {{ $labels.gpu }} of {{ $labels.Hostname }} went from busy to idle"
+            description: >-
+              Utilisation averaged over 50% for ten minutes and has been under 5%
+              for three. If a job was meant to be running, it has died or hung.
+
+    ########################################
+    # The exporter itself
+    ########################################
+    - name: gpu-fleet.exporter
+      rules:
+        # Only fires for a target that exists and is failing. When the GPU node
+        # is destroyed at the end of a session its target disappears rather than
+        # going down, so a normal teardown does not page anybody.
+        - alert: DCGMExporterDown
+          expr: up{namespace="gpu-operator", service="nvidia-dcgm-exporter"} == 0
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "DCGM exporter on {{ $labels.pod }} is not being scraped"
+            description: >-
+              Every GPU alert on this node depends on this exporter. While it is
+              down, GPU faults on the node are not being seen.
+
+        # Session A saw the exporter restart three times in its first minutes.
+        # This makes a repeat visible instead of leaving it to be noticed.
+        - alert: DCGMExporterRestarting
+          expr: increase(kube_pod_container_status_restarts_total{namespace="gpu-operator", pod=~"nvidia-dcgm-exporter-.*"}[15m]) > 2
+          labels:
+            severity: warning
+          annotations:
+            summary: "DCGM exporter {{ $labels.pod }} restarted more than twice in 15 minutes"
+            description: >-
+              XID counts reset on every restart, and XIDs raised while it is down
+              are lost. Read its previous logs.

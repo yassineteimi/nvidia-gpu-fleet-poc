@@ -59,11 +59,18 @@ Git next to everything else.
 
 | Wave | Components |
 |---|---|
-| 0 | Node Feature Discovery |
-| 1 | GPU Operator, kube-prometheus-stack |
-| 2 | Grafana dashboards, Prometheus alert rules |
+| -1 | local-path-provisioner |
+| 0 | Node Feature Discovery, kube-prometheus-stack |
+| 1 | GPU Operator |
+| 2 | GPU alert rules and the Grafana dashboard |
 | 3 | node-problem-detector, gpu-remediator |
 | 4 | Tenant namespaces and quotas |
+
+kube-prometheus-stack sits in wave 0, not wave 1 as first planned, because the GPU
+Operator's ServiceMonitor for the DCGM exporter needs the Prometheus Operator's CRDs
+to exist first. The waves only order readiness, rather than just creation, because
+the ArgoCD values restore health checks for `Application` resources, which ArgoCD
+dropped in 1.8. See [Findings](findings.md).
 
 Node Feature Discovery is deployed as its own `Application` with `nfd.enabled=false`
 in the GPU Operator values. The GPU Operator can bring its own NFD, but owning it

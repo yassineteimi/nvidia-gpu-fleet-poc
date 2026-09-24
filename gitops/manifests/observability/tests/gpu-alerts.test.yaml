@@ -1,0 +1,283 @@
+# promtool unit tests for gitops/manifests/observability/gpu-alerts.yaml.
+#
+# Run with: make test-rules
+#
+# These prove the rule logic against synthetic series. They cannot prove the
+# exporter emits what the rules expect; that is what the live session is for.
+# Every case below that expects an alert has a twin that expects silence,
+# because a rule that always fires passes half its tests.
+
+rule_files:
+  - gpu-alerts.rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  ##########################################################################
+  # GPUXidCritical, first XID ever on a node.
+  #
+  # The series does not exist for ten minutes, then appears already at 1,
+  # which is what the exporter does the first time a given XID happens.
+  # increase() alone returns 0 here; the new-series branch is what fires.
+  ##########################################################################
+  - name: first XID 79 ever is caught although the counter is born at 1
+    interval: 1m
+    input_series:
+      - series: 'DCGM_EXP_XID_ERRORS_TOTAL{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test", xid="79", pod="nvidia-dcgm-exporter-a"}'
+        values: '_x10 1x30'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: GPUXidCritical
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: GPUXidCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              Hostname: gpu-fleet-gpu-01
+              gpu: "0"
+              UUID: GPU-test
+              xid: "79"
+            exp_annotations:
+              summary: "XID 79 on GPU 0 of gpu-fleet-gpu-01"
+              description: "XID 79 is not on the NVIDIA device plugin's list of application errors, so the device plugin will also have marked this GPU unhealthy. Cordon the node and run dcgmi diag before returning it to service."
+      # Twenty minutes later nothing new has happened: the alert must have cleared.
+      - eval_time: 30m
+        alertname: GPUXidCritical
+        exp_alerts: []
+      # And an XID 79 is never an application error.
+      - eval_time: 12m
+        alertname: GPUXidApplication
+        exp_alerts: []
+
+  ##########################################################################
+  # GPUXidCritical, a repeat of an XID the counter already knows about.
+  ##########################################################################
+  - name: a second XID 48 on an existing series fires through increase
+    interval: 1m
+    input_series:
+      - series: 'DCGM_EXP_XID_ERRORS_TOTAL{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test", xid="48", pod="nvidia-dcgm-exporter-a"}'
+        values: '1x10 2x20'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: GPUXidCritical
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: GPUXidCritical
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              Hostname: gpu-fleet-gpu-01
+              gpu: "0"
+              UUID: GPU-test
+              xid: "48"
+            exp_annotations:
+              summary: "XID 48 on GPU 0 of gpu-fleet-gpu-01"
+              description: "XID 48 is not on the NVIDIA device plugin's list of application errors, so the device plugin will also have marked this GPU unhealthy. Cordon the node and run dcgmi diag before returning it to service."
+      - eval_time: 25m
+        alertname: GPUXidCritical
+        exp_alerts: []
+
+  ##########################################################################
+  # Application XIDs are a warning, never a GPU fault.
+  ##########################################################################
+  - name: XID 13 is an application error, not a GPU fault
+    interval: 1m
+    input_series:
+      - series: 'DCGM_EXP_XID_ERRORS_TOTAL{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test", xid="13", pod="nvidia-dcgm-exporter-a"}'
+        values: '_x10 1x20'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: GPUXidCritical
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: GPUXidApplication
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              Hostname: gpu-fleet-gpu-01
+              gpu: "0"
+              UUID: GPU-test
+              xid: "13"
+            exp_annotations:
+              summary: "Application XID 13 on GPU 0 of gpu-fleet-gpu-01"
+              description: "XID 13 is an application error. The GPU is expected to be healthy. A workload crashed or misbehaved on it."
+
+  ##########################################################################
+  # GPUUtilisationCollapse: busy for fifteen minutes, then killed.
+  #
+  # 90% from 0m to 15m, 0% from 16m. The rule needs ten busy minutes that
+  # ended at least three minutes ago, three idle minutes since, and one more
+  # minute of both to fire.
+  ##########################################################################
+  - name: a busy GPU that goes idle fires, then resolves
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_UTIL{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test", pod="nvidia-dcgm-exporter-a"}'
+        values: '90x15 0x15'
+    alert_rule_test:
+      # Still inside the three idle minutes: the 90 at 15m is in the window.
+      - eval_time: 17m
+        alertname: GPUUtilisationCollapse
+        exp_alerts: []
+      - eval_time: 19m
+        alertname: GPUUtilisationCollapse
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              Hostname: gpu-fleet-gpu-01
+              gpu: "0"
+              UUID: GPU-test
+            exp_annotations:
+              summary: "GPU 0 of gpu-fleet-gpu-01 went from busy to idle"
+              description: "Utilisation averaged over 50% for ten minutes and has been under 5% for three. If a job was meant to be running, it has died or hung."
+      # Once the busy period falls out of the look-back window, it resolves.
+      - eval_time: 28m
+        alertname: GPUUtilisationCollapse
+        exp_alerts: []
+
+  - name: a GPU that was never busy does not collapse
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_UTIL{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test", pod="nvidia-dcgm-exporter-a"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: GPUUtilisationCollapse
+        exp_alerts: []
+
+  - name: a short dip in a busy GPU does not fire
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_GPU_UTIL{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test", pod="nvidia-dcgm-exporter-a"}'
+        values: '90x14 0 0 90x14'
+    alert_rule_test:
+      - eval_time: 17m
+        alertname: GPUUtilisationCollapse
+        exp_alerts: []
+      - eval_time: 20m
+        alertname: GPUUtilisationCollapse
+        exp_alerts: []
+
+  ##########################################################################
+  # Memory health.
+  ##########################################################################
+  - name: a double bit ECC error fires, and a clean counter does not
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_ECC_DBE_VOL_TOTAL{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test"}'
+        values: '0x10 1x20'
+      - series: 'DCGM_FI_DEV_ECC_DBE_VOL_TOTAL{Hostname="gpu-fleet-gpu-02", gpu="0", UUID="GPU-clean"}'
+        values: '0x30'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: GPUECCDoubleBitError
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              Hostname: gpu-fleet-gpu-01
+              gpu: "0"
+              UUID: GPU-test
+            exp_annotations:
+              summary: "Uncorrectable ECC error on GPU 0 of gpu-fleet-gpu-01"
+              description: "A double bit ECC error cannot be corrected, and whatever was using that memory may have read corrupted data."
+
+  - name: a failed row remap fires
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_ROW_REMAP_FAILURE{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test"}'
+        values: '0x5 1x5'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: GPURowRemapFailure
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: GPURowRemapFailure
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              Hostname: gpu-fleet-gpu-01
+              gpu: "0"
+              UUID: GPU-test
+            exp_annotations:
+              summary: "Row remapping failed on GPU 0 of gpu-fleet-gpu-01"
+              description: "The GPU could not remap a failing memory row. It has run out of spare rows or failed to use one, and needs to come out of service."
+
+  ##########################################################################
+  # Throttling. The counters are nanoseconds of throttling, so adding 1.2e10
+  # per minute is 2e8 ns per second: throttled 20% of the time. Above the
+  # thermal threshold of 10%, below the power threshold of 50%. The same input
+  # has to fire one rule and not the other.
+  ##########################################################################
+  - name: 20 percent throttling trips the thermal rule but not the power rule
+    interval: 1m
+    input_series:
+      - series: 'DCGM_FI_DEV_THERMAL_VIOLATION{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test"}'
+        values: '0+12000000000x40'
+      - series: 'DCGM_FI_DEV_POWER_VIOLATION{Hostname="gpu-fleet-gpu-01", gpu="0", UUID="GPU-test"}'
+        values: '0+12000000000x40'
+    alert_rule_test:
+      - eval_time: 20m
+        alertname: GPUThermalThrottling
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              Hostname: gpu-fleet-gpu-01
+              gpu: "0"
+              UUID: GPU-test
+            exp_annotations:
+              summary: "GPU 0 of gpu-fleet-gpu-01 thermally throttled over 10% of the time"
+              description: "Clocks are being reduced for temperature. Check cooling before trusting any benchmark or burn in figure from this node."
+      - eval_time: 30m
+        alertname: GPUPowerThrottling
+        exp_alerts: []
+
+  ##########################################################################
+  # The exporter.
+  ##########################################################################
+  - name: an exporter that stops answering fires after five minutes
+    interval: 1m
+    input_series:
+      - series: 'up{namespace="gpu-operator", service="nvidia-dcgm-exporter", pod="nvidia-dcgm-exporter-a", job="nvidia-dcgm-exporter"}'
+        values: '1x5 0x10'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: DCGMExporterDown
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: DCGMExporterDown
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+              namespace: gpu-operator
+              service: nvidia-dcgm-exporter
+              pod: nvidia-dcgm-exporter-a
+              job: nvidia-dcgm-exporter
+            exp_annotations:
+              summary: "DCGM exporter on nvidia-dcgm-exporter-a is not being scraped"
+              description: "Every GPU alert on this node depends on this exporter. While it is down, GPU faults on the node are not being seen."
+
+  # The Session A pattern: three restarts in the first few minutes.
+  - name: three exporter restarts in fifteen minutes fire
+    interval: 1m
+    input_series:
+      - series: 'kube_pod_container_status_restarts_total{namespace="gpu-operator", pod="nvidia-dcgm-exporter-a", container="nvidia-dcgm-exporter"}'
+        values: '0x3 1 2 3 3x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: DCGMExporterRestarting
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: DCGMExporterRestarting
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: gpu-operator
+              pod: nvidia-dcgm-exporter-a
+              container: nvidia-dcgm-exporter
+            exp_annotations:
+              summary: "DCGM exporter nvidia-dcgm-exporter-a restarted more than twice in 15 minutes"
+              description: "XID counts reset on every restart, and XIDs raised while it is down are lost. Read its previous logs."
+      - eval_time: 25m
+        alertname: DCGMExporterRestarting
+        exp_alerts: []

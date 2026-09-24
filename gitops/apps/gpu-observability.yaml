@@ -1,0 +1,43 @@
+# The GPU fleet's alert rules and dashboard, sync wave 2.
+#
+# After kube-prometheus-stack (wave 0), whose CRDs define PrometheusRule and
+# whose Grafana sidecar picks up the dashboard, and after the GPU Operator
+# (wave 1), whose exporter produces every metric these read. Plain manifests
+# from this repository, rendered by kustomize, so the dashboard JSON can stay a
+# file of its own.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gpu-observability
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+    targetRevision: main
+    path: gitops/manifests/observability
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    # ArgoCD does not retry a failed automatic sync of the same commit on its
+    # own. Without this, losing a race with a CRD would leave it failed.
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

@@ -1,0 +1,146 @@
+# Values for kube-prometheus-stack, chart 91.4.1.
+#
+# Everything here runs on the control plane, a 4 vCPU / 8 GB node that also
+# carries etcd, the API server and ArgoCD. The GPU node is destroyed at the end
+# of every session, and monitoring that lived on it would go with it, so every
+# component with state or a UI is pinned to the control plane. The one thing
+# that must run everywhere, node-exporter, is a DaemonSet and does.
+
+########################################
+# What not to scrape
+#
+# kubeadm binds the controller manager, the scheduler, etcd's metrics and
+# kube-proxy's metrics to 127.0.0.1. Prometheus cannot reach them, and the
+# chart's rules for them fire "down" alerts forever. Rebinding them means
+# editing static pod manifests on the node by hand, which is exactly the kind
+# of change this repository does not make. So they are switched off, together
+# with their alert and recording rules, and the gap is stated rather than
+# hidden behind permanently firing alerts.
+########################################
+
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+    windows: false
+
+########################################
+# Prometheus
+########################################
+
+prometheus:
+  prometheusSpec:
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+
+    # Pick up every ServiceMonitor, PodMonitor and PrometheusRule in the
+    # cluster, not only the ones labelled with this Helm release. The GPU
+    # Operator creates the DCGM exporter's ServiceMonitor itself, and the GPU
+    # alert rules come from another Application, so neither carries the label.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+
+    # Fifteen days is enough to compare sessions a week apart, which is the
+    # reason the control plane stays up at all. The size cap is the backstop,
+    # well inside the volume below.
+    retention: 15d
+    retentionSize: 20GB
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 25Gi
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 768Mi
+      limits:
+        memory: 2Gi
+
+########################################
+# Alertmanager
+#
+# The chart's default configuration already routes every alert to a receiver
+# called "null" that sends nothing, which is the decision for Session B: an
+# alert has to be observed firing, and the Alertmanager API records that
+# without a webhook URL or SMTP password to keep somewhere.
+########################################
+
+alertmanager:
+  alertmanagerSpec:
+    nodeSelector:
+      node-role.kubernetes.io/control-plane: ""
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+
+########################################
+# Grafana
+#
+# No persistence on purpose. Every dashboard comes from Git through the
+# sidecar, the datasource is provisioned by the chart, and nothing clicked into
+# the UI is meant to survive.
+########################################
+
+grafana:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 192Mi
+    limits:
+      memory: 384Mi
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+
+########################################
+# The operator and the exporters
+########################################
+
+prometheusOperator:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  admissionWebhooks:
+    deployment:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+    patch:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+kube-state-metrics:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""

@@ -1,0 +1,56 @@
+# Local path storage, sync wave -1.
+#
+# Session B's Prometheus needs a volume, so that metrics history survives pod
+# restarts and every GPU node teardown. A kubeadm cluster has no storage class
+# at all, and the alternative, Scaleway's block storage CSI driver, would put
+# Scaleway API credentials inside the cluster. This keeps data on the control
+# plane's own disk instead. The cost, stated rather than hidden: history is lost
+# if the control plane itself is rebuilt.
+#
+# Wave -1 so the storage class exists before anything in wave 0 asks for a
+# volume. The chart lives in the upstream Git repository, not a Helm repository,
+# so the first source is that repository at a release tag.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: local-path-provisioner
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  sources:
+    - repoURL: https://github.com/rancher/local-path-provisioner
+      targetRevision: v0.0.37
+      path: deploy/chart/local-path-provisioner
+      helm:
+        releaseName: local-path-provisioner
+        valueFiles:
+          - $values/gitops/values/local-path-provisioner.yaml
+
+    - repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+      targetRevision: main
+      ref: values
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: local-path-storage
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    # ArgoCD does not retry a failed automatic sync of the same commit on its
+    # own. Without this, losing a race with a CRD would leave it failed.
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

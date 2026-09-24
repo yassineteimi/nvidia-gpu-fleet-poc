@@ -1,0 +1,29 @@
+# Values for local-path-provisioner, chart 0.0.37.
+
+storageClass:
+  name: local-path
+  # Not the cluster default. Only the monitoring stack asks for it, by name, so
+  # nothing else lands on the control plane's disk by accident.
+  defaultClass: false
+  # Retain, not the chart's Delete. A PersistentVolumeClaim deleted by mistake,
+  # or by an over-eager prune, should leave the metrics on disk to be recovered
+  # rather than take two weeks of history with it.
+  reclaimPolicy: Retain
+  volumeBindingMode: WaitForFirstConsumer
+
+# Where volumes may live, and where they may not.
+#
+# The GPU node is listed with no paths, which makes the provisioner refuse to
+# create a volume on it at all. The monitoring stack is also pinned to the
+# control plane by node selector, but this is the stronger guarantee: a volume
+# on the GPU node would be destroyed with it at the end of every session, and
+# this makes that impossible rather than merely unlikely.
+nodePathMap:
+  - node: DEFAULT_PATH_FOR_NON_LISTED_NODES
+    paths:
+      - /opt/local-path-provisioner
+  - node: gpu-fleet-gpu-01
+    paths: []
+
+nodeSelector:
+  node-role.kubernetes.io/control-plane: ""

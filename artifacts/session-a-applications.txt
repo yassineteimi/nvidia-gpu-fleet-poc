@@ -1,0 +1,4 @@
+NAME                     SYNC STATUS   HEALTH STATUS   REVISION                                   PROJECT
+gpu-operator             Synced        Healthy                                                    default
+node-feature-discovery   Synced        Healthy                                                    default
+root                     OutOfSync     Healthy         4c61ae310c897419d84ed69b31076a038e100afd   default

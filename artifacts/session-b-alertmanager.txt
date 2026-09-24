@@ -1,0 +1,2 @@
+GPUUtilisationCollapse  state=active  since=2026-09-24T13:47:00.349Z  severity=warning
+GPUXidCritical  state=active  since=2026-09-24T13:50:30.389Z  severity=critical

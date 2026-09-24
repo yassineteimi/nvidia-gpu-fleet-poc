@@ -1,0 +1,8 @@
+restarts=2
+== last termination
+nvidia-dcgm-exporter: Error exit=1 at 2026-09-24T13:14:18Z
+== previous container log, last 40 lines
+Defaulted container "nvidia-dcgm-exporter" out of: nvidia-dcgm-exporter, toolkit-validation (init)
+time=2026-09-24T13:14:13.404Z level=INFO msg="Starting dcgm-exporter" Version=4.6.0-4.8.3
+time=2026-09-24T13:14:13.406Z level=INFO msg="Attempting to connect to remote hostengine at nvidia-dcgm:5555"
+time=2026-09-24T13:14:18.867Z level=ERROR msg="Failed to connect to remote hostengine" mode=standalone address=nvidia-dcgm:5555 enable_dcgm_log=false dcgm_log_level=NONE uid=0 euid=0 running_as_root=true has_cap_sys_admin=true hint="Verify nv-hostengine is running and listening on the expected address. For IPv6, use bracket notation: [<IPv6_ADDR>]:<PORT> (e.g., \"[::1]:5555\")" error="error connecting to nv-hostengine: Host engine connection invalid/disconnected"

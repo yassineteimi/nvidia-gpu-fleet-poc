@@ -1,0 +1,2 @@
+NAME              STATUS   ROLES           AGE   VERSION   INTERNAL-IP    EXTERNAL-IP   OS-IMAGE             KERNEL-VERSION               CONTAINER-RUNTIME
+gpu-fleet-cp-01   Ready    control-plane   35m   v1.36.4   172.16.32.10   <none>        Ubuntu 22.04.5 LTS   5.15.0-190-generic (amd64)   containerd://2.3.5

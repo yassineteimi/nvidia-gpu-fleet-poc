@@ -1,0 +1,1426 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Taking a rented NVIDIA L4 node from bare instance to a GitOps-managed, monitored and self-remediating GPU platform on upstream Kubernetes. Driver lifecycle through the GPU Operator, DCGM telemetry and XID alerting, automated cordon and drain on GPU fault, goodput measurement and a cluster acceptance runbook.">
+      
+      
+        <meta name="author" content="Yassine TEIMI">
+      
+      
+        <link rel="canonical" href="https://yassineteimi.github.io/nvidia-gpu-fleet-poc/02-observability/">
+      
+      
+        <link rel="prev" href="../01-platform/">
+      
+      
+        <link rel="next" href="../03-fault-remediation/">
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.5.49">
+    
+    
+      
+        <title>Session B: observability and XID alerting - NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.6f8fc17f.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.06af60db.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/terminal.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#session-b-observability-and-xid-alerting" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes" class="md-header__button md-logo" aria-label="NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Session B: observability and XID alerting
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="lime"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 7H7a5 5 0 0 0-5 5 5 5 0 0 0 5 5h10a5 5 0 0 0 5-5 5 5 0 0 0-5-5m0 8a3 3 0 0 1-3-3 3 3 0 0 1 3-3 3 3 0 0 1 3 3 3 3 0 0 1-3 3"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 6H7c-3.31 0-6 2.69-6 6s2.69 6 6 6h10c3.31 0 6-2.69 6-6s-2.69-6-6-6m0 10H7c-2.21 0-4-1.79-4-4s1.79-4 4-4h10c2.21 0 4 1.79 4 4s-1.79 4-4 4M7 9c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    yassineteimi/nvidia-gpu-fleet-poc
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+    
+  
+  Overview
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../simulated/" class="md-tabs__link">
+        
+  
+    
+  
+  What is simulated
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../prerequisites/" class="md-tabs__link">
+        
+  
+    
+  
+  Prerequisites
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../architecture/" class="md-tabs__link">
+        
+  
+    
+  
+  Architecture
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../01-platform/" class="md-tabs__link">
+          
+  
+  Build
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../runbook/" class="md-tabs__link">
+        
+  
+    
+  
+  Runbook
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../artifacts/" class="md-tabs__link">
+        
+  
+    
+  
+  Artifacts
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../findings/" class="md-tabs__link">
+        
+  
+    
+  
+  Findings
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+  
+
+<nav class="md-nav md-nav--primary md-nav--lifted md-nav--integrated" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes" class="md-nav__button md-logo" aria-label="NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M439.55 236.05 244 40.45a28.87 28.87 0 0 0-40.81 0l-40.66 40.63 51.52 51.52c27.06-9.14 52.68 16.77 43.39 43.68l49.66 49.66c34.23-11.8 61.18 31 35.47 56.69-26.49 26.49-70.21-2.87-56-37.34L240.22 199v121.85c25.3 12.54 22.26 41.85 9.08 55a34.34 34.34 0 0 1-48.55 0c-17.57-17.6-11.07-46.91 11.25-56v-123c-20.8-8.51-24.6-30.74-18.64-45L142.57 101 8.45 235.14a28.86 28.86 0 0 0 0 40.81l195.61 195.6a28.86 28.86 0 0 0 40.8 0l194.69-194.69a28.86 28.86 0 0 0 0-40.81"/></svg>
+  </div>
+  <div class="md-source__repository">
+    yassineteimi/nvidia-gpu-fleet-poc
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Overview
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../simulated/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    What is simulated
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../prerequisites/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Prerequisites
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Architecture
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  <span class="md-ellipsis">
+    Build
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Build
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../01-platform/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Session A: platform and GPU lifecycle
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    Session B: observability and XID alerting
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  <span class="md-ellipsis">
+    Session B: observability and XID alerting
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      Results
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#timeline" class="md-nav__link">
+    <span class="md-ellipsis">
+      Timeline
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-l4-under-load" class="md-nav__link">
+    <span class="md-ellipsis">
+      The L4 under load
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-load-job-i-didnt-actually-kill" class="md-nav__link">
+    <span class="md-ellipsis">
+      The load job I didn't actually kill
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-simulated-xid-from-dcgm-to-alertmanager" class="md-nav__link">
+    <span class="md-ellipsis">
+      A simulated XID, from DCGM to Alertmanager
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-dashboard-had-the-same-bug-as-the-alert" class="md-nav__link">
+    <span class="md-ellipsis">
+      The dashboard had the same bug as the alert
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#two-restarts-and-an-alert-that-miscounted-them" class="md-nav__link">
+    <span class="md-ellipsis">
+      Two restarts, and an alert that miscounted them
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-this-gpu-had-been-through-before-i-rented-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      What this GPU had been through before I rented it
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-i-changed-because-of-the-session" class="md-nav__link">
+    <span class="md-ellipsis">
+      What I changed because of the session
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-i-built-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      How I built it
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How I built it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      The plan
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Decisions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-reading-the-source-changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      What reading the source changed
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b1-writing-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      B1: writing it
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#b1-deploying-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      B1: deploying it
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#checking-the-dcgm-image-without-a-gpu" class="md-nav__link">
+    <span class="md-ellipsis">
+      Checking the DCGM image without a GPU
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../03-fault-remediation/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Session C: fault detection and remediation
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../04-goodput-and-burn-in/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Session D: goodput, burn-in and tenancy
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../runbook/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Runbook
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../artifacts/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Artifacts
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../findings/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    Findings
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+  
+  
+
+
+<h1 id="session-b-observability-and-xid-alerting">Session B: observability and XID alerting</h1>
+<div class="admonition success">
+<p class="admonition-title">Done, 2026-09-24</p>
+<p>All five acceptance criteria passed on a real L4. One passed with a caveat: the
+load job had already finished when I killed it, and I explain that
+<a href="#the-load-job-i-didnt-actually-kill">below</a>. I also ran the XID alert end to end with an
+injected XID 79, which I mark as simulated wherever it appears.</p>
+</div>
+<p><strong>Scope:</strong> Prometheus scrapes the DCGM exporter. A Grafana dashboard from Git shows
+utilisation, framebuffer, temperature, power, ECC, clock event reasons and XID.
+Alert rules cover critical XIDs and a job's utilisation collapsing.</p>
+<h2 id="results">Results</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Acceptance criterion</th>
+<th>Result</th>
+<th>Evidence</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Prometheus scrapes the exporter, and every counter in the custom set is there, including the ones the exporter ships disabled</td>
+<td><strong>Pass.</strong> 34 of 34</td>
+<td><a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-counters.txt"><code>session-b-counters.txt</code></a></td>
+</tr>
+<tr>
+<td>2</td>
+<td>A dashboard loaded from Git, not built in the UI, shows live data</td>
+<td><strong>Pass.</strong> Every panel with data to show had it. Two panels had a bug, which I found and fixed (<a href="#the-dashboard-had-the-same-bug-as-the-alert">details</a>)</td>
+<td>Screenshots below</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>GPUUtilisationCollapse</code> goes pending, then firing, after a real load job is killed</td>
+<td><strong>Pass, with a caveat.</strong> Pending 13:46:03, firing 13:47:03. The job had finished seconds before the kill</td>
+<td><a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-alert-timeline.txt"><code>session-b-alert-timeline.txt</code></a>, <a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-load-timeline.txt"><code>session-b-load-timeline.txt</code></a></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Every alert rule has a <code>promtool</code> unit test that passes offline</td>
+<td><strong>Pass.</strong> 12 test cases, 26 alert evaluations. I added one during the session</td>
+<td><code>make test-rules</code>, and the <code>test-rules</code> job in CI</td>
+</tr>
+<tr>
+<td>5</td>
+<td>Prometheus history survives destroying the GPU node</td>
+<td><strong>Pass.</strong> 193 GPU utilisation samples, peak 100%, read back with no GPU node in the cluster</td>
+<td><a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-history.txt"><code>session-b-history.txt</code></a></td>
+</tr>
+<tr>
+<td>opt.</td>
+<td><code>GPUXidCritical</code> fires on an XID 79 injected through DCGM</td>
+<td><strong>Fired. Simulated.</strong> 32 seconds from injection to Alertmanager</td>
+<td><a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-alertmanager.txt"><code>session-b-alertmanager.txt</code></a></td>
+</tr>
+</tbody>
+</table>
+<h2 id="timeline">Timeline</h2>
+<p>All times are UTC, taken from the files in <code>docs/artifacts/</code>. Prometheus's <code>ALERTS</code>
+series was read back at a 15 second step, so the alert times are accurate to 15
+seconds. The Alertmanager times are exact.</p>
+<table>
+<thead>
+<tr>
+<th>Time</th>
+<th>Event</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>13:13:48</td>
+<td><code>DCGMExporterDown</code> pending: the target exists but doesn't answer yet. It cleared at 13:14:33 without firing, which is what its 5 minute <code>for:</code> is there for</td>
+</tr>
+<tr>
+<td>13:14:18</td>
+<td>The exporter's second and last crash. It couldn't reach the standalone DCGM host engine</td>
+</tr>
+<tr>
+<td>13:15:18</td>
+<td><code>DCGMExporterRestarting</code> fires on those two restarts. It shouldn't have (<a href="#two-restarts-and-an-alert-that-miscounted-them">why</a>)</td>
+</tr>
+<tr>
+<td>13:23:14</td>
+<td>Load running: <code>dcgmproftester13</code> keeps the tensor cores busy, 20 minutes requested</td>
+</tr>
+<tr>
+<td>13:26:18</td>
+<td><code>GPUPowerThrottling</code> pending. I hadn't planned for this one</td>
+</tr>
+<tr>
+<td>13:41:18</td>
+<td><code>GPUPowerThrottling</code> fires after 15 minutes pending</td>
+</tr>
+<tr>
+<td>~13:43</td>
+<td>The load reaches the end of its 20 minutes and exits</td>
+</tr>
+<tr>
+<td>13:43:09</td>
+<td><code>make load-stop</code></td>
+</tr>
+<tr>
+<td>13:46:03</td>
+<td><code>GPUUtilisationCollapse</code> pending</td>
+</tr>
+<tr>
+<td>13:47:03</td>
+<td><code>GPUUtilisationCollapse</code> firing. Alertmanager has it from 13:47:00</td>
+</tr>
+<tr>
+<td>13:49:58</td>
+<td>XID 79 injected into DCGM's cache. <strong>Simulated</strong></td>
+</tr>
+<tr>
+<td>13:50:30</td>
+<td><code>GPUXidCritical</code> reaches Alertmanager, severity critical, <code>xid="79"</code></td>
+</tr>
+<tr>
+<td>14:03:57</td>
+<td>After <code>make down</code>: no GPU node left, and its history is still in Prometheus</td>
+</tr>
+</tbody>
+</table>
+<h2 id="the-l4-under-load">The L4 under load</h2>
+<p><img alt="The GPU fleet dashboard twelve minutes into the load" src="../artifacts/session-b-dashboard-under-load-1.png" /></p>
+<p>Utilisation 100%, SM activity 99%, tensor pipes about 95% active and DRAM about 25%.
+That's the profile a tensor core benchmark should have, compute bound rather than
+memory bound, and <code>dcgmproftester</code> reported about 49.4 TFLOPS
+(<a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-load-job.txt"><code>session-b-load-job.txt</code></a>).
+Framebuffer use stayed at 2.57%, since the test runs out of registers and shared
+memory. The card drew 72.1 W at 58 °C.</p>
+<p><img alt="Throttling, clock events and faults at the same moment" src="../artifacts/session-b-dashboard-under-load-2.png" /></p>
+<p>72 W is the L4's power limit. The card spent about 85% of the load throttled for
+power, none of it for temperature, and the SM clock sat well below what an
+unconstrained L4 runs at. The card is fine; a 72 W part under a sustained tensor load
+is power bound, and DCGM shows exactly that.</p>
+<p>So <strong><code>GPUPowerThrottling</code> fired on real hardware behaviour</strong>, without anything
+injected. The rule fires when power throttling takes more than half the time for 15
+minutes, and 20 minutes of tensor load was enough. I made it <code>info</code> on purpose. An L4
+at full load is expected to be power bound, so the alert only matters on a job that
+shouldn't be anywhere near the limit, and nobody should be woken up for it. It
+resolved by itself once the load stopped.</p>
+<h2 id="the-load-job-i-didnt-actually-kill">The load job I didn't actually kill</h2>
+<p><img alt="GPUUtilisationCollapse firing, from the rule in Git" src="../artifacts/session-b-collapse-firing.png" /></p>
+<p><code>GPUUtilisationCollapse</code> compares the 10 minutes that ended 3 minutes ago with the
+last 3 minutes. It went pending 2 minutes 54 seconds after <code>make load-stop</code>, as that
+3 minute window closed, and fired a minute later on its <code>for:</code>. The rule in the
+screenshot is the one ArgoCD loaded from <code>gitops/manifests/observability/</code>.</p>
+<p>The criterion said the job had to be <strong>killed</strong>, and strictly speaking it wasn't. I
+requested 20 minutes of load. When <code>make load-stop</code> read the job's log at 13:43:09,
+it already ended with <code>GPU 0, TestField 1004 test PASSED.</code> and <code>All Tests Passed.</code>, so
+<code>dcgmproftester</code> had finished a few seconds earlier and the stop deleted a completed
+job. The alert can't tell the difference, since what it detects is a busy GPU going
+idle with no warning, and that did happen. Still, "killed" was the claim, so I'm
+recording it as not quite met.</p>
+<p>I changed two things so it can't happen again: <code>make load</code> now defaults to an hour,
+and <code>make load-stop</code> records whether the pod was still running when it deleted it,
+with a warning if it wasn't.</p>
+<h2 id="a-simulated-xid-from-dcgm-to-alertmanager">A simulated XID, from DCGM to Alertmanager</h2>
+<p><code>make inject-xid-dcgm</code> uses <code>dcgmi test --inject</code> to write the value 79 into DCGM's
+field 230, <code>DCGM_FI_DEV_XID_ERRORS</code>. Nothing happened on the card. What this tests is
+everything downstream of DCGM:</p>
+<ul>
+<li>the exporter turns the value into the raw field and into its own counter,
+  <code>DCGM_EXP_XID_ERRORS_TOTAL{xid="79"}</code>;</li>
+<li>the rule's "new series" branch catches a first XID, which a plain <code>increase()</code>
+  would miss (<a href="../findings/">Findings</a> has the details);</li>
+<li>Alertmanager receives it as critical, 32 seconds after the injection.</li>
+</ul>
+<p>It also answered a question from my first capture, which had reported
+<code>DCGM_FI_DEV_XID_ERRORS</code> as missing. Before the injection the field had no series,
+and afterwards it had one: a GPU that's never had an XID gives the exporter nothing
+to publish.</p>
+<p><img alt="The faults row after the simulated XID 79" src="../artifacts/session-b-dashboard-after-xid.png" /></p>
+<p>After the injection, "Last XID seen" reads 79 and DCGM health reads 20, DCGM's FAIL
+result. During the load it had read 10, a warning. I didn't capture which DCGM health
+system raised that warning, so I won't guess.</p>
+<h2 id="the-dashboard-had-the-same-bug-as-the-alert">The dashboard had the same bug as the alert</h2>
+<p>Look at that last screenshot again. The alert fired and "Last XID seen" says 79, but
+"XIDs by code" is flat at zero. The panel plotted
+<code>increase(DCGM_EXP_XID_ERRORS_TOTAL[$__rate_interval])</code>, and a series that starts at 1
+and stays there has no increase. I'd written and unit tested the alert rule
+specifically to avoid this trap, then walked into it on the dashboard, which had no
+tests. "Clock events by reason" had the same problem: the power cap switched on once,
+stayed on for 20 minutes, and the panel showed nothing.</p>
+<p>Both panels now plot the cumulative count since the exporter started.</p>
+<h2 id="two-restarts-and-an-alert-that-miscounted-them">Two restarts, and an alert that miscounted them</h2>
+<p>Session A left a question open: <code>nvidia-dcgm-exporter</code> restarted three times while the
+node came up, and I hadn't captured why. This time it restarted twice, and
+<code>make capture-b</code> saved the previous container's log
+(<a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-exporter-restarts.txt"><code>session-b-exporter-restarts.txt</code></a>):</p>
+<div class="terminal highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nv">level</span><span class="o">=</span>INFO<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">"Attempting to connect to remote hostengine at nvidia-dcgm:5555"</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nv">level</span><span class="o">=</span>ERROR<span class="w"> </span><span class="nv">msg</span><span class="o">=</span><span class="s2">"Failed to connect to remote hostengine"</span><span class="w"> </span><span class="nv">mode</span><span class="o">=</span>standalone<span class="w"> </span><span class="nv">address</span><span class="o">=</span>nvidia-dcgm:5555
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="nv">error</span><span class="o">=</span><span class="s2">"error connecting to nv-hostengine: Host engine connection invalid/disconnected"</span>
+</code></pre></div>
+<p>The exporter starts before the standalone DCGM host engine accepts connections, exits
+with code 1, and the kubelet restarts it until the host engine answers. That's the
+price of running DCGM standalone, which I keep because Session C needs <code>dcgmi diag</code>.
+It's harmless; the restarts are how it recovers, and the exporter stayed up for the
+rest of the session.</p>
+<p>The alert I'd written for this, <code>DCGMExporterRestarting</code>, is meant to fire on more
+than two restarts in 15 minutes. It fired on two. <code>increase()</code> extrapolates on a
+counter that starts inside its window, and for a few seconds it read about 2.3. I
+reproduced it offline with <code>promtool</code>, switched the rule to <code>changes()</code>, and added a
+regression test that fails on the old rule.</p>
+<h2 id="what-this-gpu-had-been-through-before-i-rented-it">What this GPU had been through before I rented it</h2>
+<p>Two panels show history the card came with: <strong>one correctable remapped row</strong>, and an
+aggregate count of <strong>just under 100 single-bit ECC errors</strong>. Aggregate counters
+survive reboots, so they cover the card's whole life, not this session. There are no
+uncorrectable remapped rows, no remap failures and no double-bit errors, so it's a
+healthy GPU but not a new one. An acceptance procedure should read these counters at
+handover rather than assume they start at zero. I read these values off the
+screenshots; I didn't capture them as text.</p>
+<h2 id="what-i-changed-because-of-the-session">What I changed because of the session</h2>
+<table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Reason</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>DCGMExporterRestarting</code> uses <code>changes()</code></td>
+<td>It fired on two restarts</td>
+</tr>
+<tr>
+<td>"XIDs by code" and "Clock events by reason" plot cumulative counts</td>
+<td>Both stayed flat through a real XID series and a real power cap</td>
+</tr>
+<tr>
+<td><code>capture-b</code> expects no <code>DCGM_FI_DEV_XID_ERRORS</code> series before the first XID</td>
+<td>My first capture reported a correct absence as missing</td>
+</tr>
+<tr>
+<td><code>make load</code> defaults to an hour; <code>make load-stop</code> records whether it killed anything</td>
+<td>The stop deleted a job that had already finished</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="how-i-built-it">How I built it</h2>
+<p>The rest of this page is the preparation: the plan, the decisions, and the work done
+before any GPU was rented.</p>
+<h3 id="the-plan">The plan</h3>
+<p>Three parts, and only the middle one rents a GPU.</p>
+<table>
+<thead>
+<tr>
+<th>Part</th>
+<th>What</th>
+<th>GPU cost</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>B1, authoring</td>
+<td>Storage, kube-prometheus-stack, custom counters, alert rules and their unit tests, dashboard, and the scripts that drive B2. Deployed to the control plane only</td>
+<td>none</td>
+</tr>
+<tr>
+<td>B2, live</td>
+<td>GPU up, targets checked, real load, job killed, alert watched firing, evidence captured, GPU down</td>
+<td>about an hour</td>
+</tr>
+<tr>
+<td>B3, write-up</td>
+<td>This page from the artifacts, then updating the landing page so nothing claims Sessions C or D are done</td>
+<td>none</td>
+</tr>
+</tbody>
+</table>
+<h3 id="decisions">Decisions</h3>
+<table>
+<thead>
+<tr>
+<th>Decision</th>
+<th>Choice</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Metrics storage</td>
+<td>local-path provisioner on the control plane disk</td>
+<td>History survives pod restarts and every GPU node teardown, with no cloud credentials in the cluster. I'd lose it only if I rebuilt the control plane</td>
+</tr>
+<tr>
+<td>Where monitoring runs</td>
+<td>Pinned to the control plane by node selector</td>
+<td>Otherwise a volume could land on the GPU node and be destroyed with it at the end of the session</td>
+</tr>
+<tr>
+<td>Alert routing</td>
+<td>Alertmanager with a null receiver</td>
+<td>The acceptance test needs to see an alert fire, and the Alertmanager API records that. No webhook or SMTP credential to manage</td>
+</tr>
+<tr>
+<td>Proving the XID rule</td>
+<td><code>promtool</code> unit tests, plus an optional DCGM injection</td>
+<td>I can't make a real XID happen on demand. The unit tests prove the rule's logic; the injection proves the pipeline, and it's listed as simulated</td>
+</tr>
+<tr>
+<td>Load for the collapse alert</td>
+<td><code>dcgmproftester</code> from the DCGM image</td>
+<td>A real tensor workload, with no extra image to pull onto a node billed by the hour. I checked it was in the image before renting a GPU</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-reading-the-source-changed">What reading the source changed</h3>
+<p>Before writing anything I checked the plan against the exporter and the operator chart
+at the versions this cluster runs. Three things changed.</p>
+<p><strong>There's a proper XID counter, and it's off by default.</strong> dcgm-exporter <code>4.8.3</code>, the
+version GPU Operator <code>v26.7.0</code> deploys, has <code>DCGM_EXP_XID_ERRORS_TOTAL</code>: a counter with
+one series per <code>xid</code> label, meant for <code>increase()</code> and <code>rate()</code>. That fixes the problem
+in <a href="../findings/">Findings</a>, where <code>DCGM_FI_DEV_XID_ERRORS</code> only holds the last XID and
+never resets, so you can't alert on it directly. The default counter set comments it
+out, along with every ECC counter, the power and thermal violation counters,
+<code>DCGM_FI_PROF_SM_ACTIVE</code> and the clock event counters. My custom counter set, kept in
+Git, turns them all on.</p>
+<p>It doesn't catch everything, because it's derived from the same DCGM field. An XID
+that DCGM never reports, like XID 62, stays invisible. That's why Session C's fault
+detection reads the kernel log and only uses DCGM to corroborate.</p>
+<p><strong>Standalone DCGM was my choice, not the chart default.</strong> Session A's values set
+<code>dcgm.enabled: true</code> under a comment that made it sound like the default. The chart
+default is <code>false</code>, with DCGM embedded in the exporter. I kept standalone because
+Session C gates return to service on <code>dcgmi diag</code>, which needs a DCGM to run against,
+but I fixed the comment. It also made standalone DCGM my main suspect for Session A's
+exporter restarts, and the session proved that suspicion right.</p>
+<p><strong>The monitoring CRDs have to exist before the GPU Operator.</strong> The operator chart
+creates a ServiceMonitor for the exporter by default, and that can't exist until the
+Prometheus Operator's CRDs do. So kube-prometheus-stack moved to sync wave 0, next to
+Node Feature Discovery, instead of wave 1.</p>
+<h3 id="b1-writing-it">B1: writing it</h3>
+<p>I wrote and checked everything before any of it reached the cluster.</p>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Where</th>
+<th>How I checked it first</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Health checks for Application resources, so the sync waves actually wait</td>
+<td><code>gitops/bootstrap/argocd-values.yaml</code></td>
+<td>Copied from ArgoCD's documentation for v3.5.3</td>
+</tr>
+<tr>
+<td>Storage that refuses volumes on the GPU node</td>
+<td><code>gitops/apps/local-path-provisioner.yaml</code>, <code>gitops/values/local-path-provisioner.yaml</code></td>
+<td>Every key exists in the chart's values at v0.0.37</td>
+</tr>
+<tr>
+<td>kube-prometheus-stack, pinned to the control plane</td>
+<td><code>gitops/apps/kube-prometheus-stack.yaml</code>, <code>gitops/values/kube-prometheus-stack.yaml</code></td>
+<td>Every key exists in the chart's values at 91.4.1, and in the Grafana 13.2.5 and kube-state-metrics 8.5.0 subcharts it pins</td>
+</tr>
+<tr>
+<td>34 DCGM counters, kept in Git</td>
+<td><code>gitops/values/gpu-operator.yaml</code></td>
+<td>Field names copied from dcgm-exporter 4.6.0-4.8.3's own counter file; the ConfigMap wiring traced through the operator's chart template and controller</td>
+</tr>
+<tr>
+<td>9 alert rules</td>
+<td><code>gitops/manifests/observability/gpu-alerts.yaml</code></td>
+<td><code>promtool</code> 3.14.0, the version the chart deploys: syntax, then 11 test cases and 25 alert evaluations at the time. I broke four rules on purpose, and each time the matching test failed</td>
+</tr>
+<tr>
+<td>The dashboard, 21 panels</td>
+<td><code>gitops/manifests/observability/dashboards/gpu-fleet.json</code></td>
+<td>All 34 queries parse in <code>promtool</code>; every DCGM metric they use is in the counter set; <code>kustomize build</code> produces the ConfigMap with the sidecar's label</td>
+</tr>
+<tr>
+<td>The B2 scripts</td>
+<td><code>scripts/check-dcgm-image.sh</code>, <code>load.sh</code>, <code>inject-xid-dcgm.sh</code>, <code>capture-b.sh</code>, <code>grafana-ui.sh</code></td>
+<td><code>shellcheck</code>. Every <code>dcgmproftester</code> and <code>dcgmi test --inject</code> flag read from DCGM's source; field IDs 230 and 1004 from <code>dcgm_fields.h</code></td>
+</tr>
+</tbody>
+</table>
+<p>Three things I couldn't check from where I wrote this. First, whether the charts render
+with these values, since <code>helm</code> and the chart repositories weren't reachable; ArgoCD's
+first sync answers that. Second, whether an injected value reaches the exporter's XID
+counter. Third, whether <code>dcgmproftester</code> runs on an L4 next to a standalone DCGM. B2
+answered the last two.</p>
+<h3 id="b1-deploying-it">B1: deploying it</h3>
+<p>I ran <code>make argocd</code> first, so ArgoCD would check the health of Application resources,
+and only then pushed to <code>main</code>. Pushing first would have deployed the stack with the
+creation-only ordering the health checks exist to prevent.</p>
+<div class="terminal highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>$<span class="w"> </span>kubectl<span class="w"> </span>-n<span class="w"> </span>argocd<span class="w"> </span>get<span class="w"> </span>applications.argoproj.io
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>NAME<span class="w">                     </span>SYNC<span class="w"> </span>STATUS<span class="w">   </span>HEALTH<span class="w"> </span>STATUS
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>gpu-observability<span class="w">        </span>Synced<span class="w">        </span>Healthy
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>gpu-operator<span class="w">             </span>Synced<span class="w">        </span>Healthy
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>kube-prometheus-stack<span class="w">    </span>Synced<span class="w">        </span>Healthy
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>local-path-provisioner<span class="w">   </span>Synced<span class="w">        </span>Healthy
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>node-feature-discovery<span class="w">   </span>Synced<span class="w">        </span>Healthy
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>root<span class="w">                     </span>Synced<span class="w">        </span>Healthy
+</code></pre></div>
+<p>All four new or changed Applications synced on the first try, which settled whether
+the charts render with these values.</p>
+<div class="terminal highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>$<span class="w"> </span>kubectl<span class="w"> </span>-n<span class="w"> </span>monitoring<span class="w"> </span>get<span class="w"> </span>pods,pvc
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>NAME<span class="w">                                                            </span>READY<span class="w">   </span>STATUS<span class="w">    </span>RESTARTS<span class="w">   </span>AGE
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>pod/alertmanager-kube-prometheus-stack-alertmanager-0<span class="w">           </span><span class="m">2</span>/2<span class="w">     </span>Running<span class="w">   </span><span class="m">0</span><span class="w">          </span>2m41s
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>pod/kube-prometheus-stack-grafana-74ccfb594b-lxdqs<span class="w">              </span><span class="m">3</span>/3<span class="w">     </span>Running<span class="w">   </span><span class="m">0</span><span class="w">          </span>56s
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>pod/kube-prometheus-stack-kube-state-metrics-84f8496f5c-8kmbq<span class="w">   </span><span class="m">1</span>/1<span class="w">     </span>Running<span class="w">   </span><span class="m">0</span><span class="w">          </span>2m49s
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>pod/kube-prometheus-stack-operator-5b5dcc8f66-pdbvl<span class="w">             </span><span class="m">1</span>/1<span class="w">     </span>Running<span class="w">   </span><span class="m">0</span><span class="w">          </span>2m49s
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>pod/kube-prometheus-stack-prometheus-node-exporter-28d9r<span class="w">        </span><span class="m">1</span>/1<span class="w">     </span>Running<span class="w">   </span><span class="m">0</span><span class="w">          </span>2m49s
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>pod/prometheus-kube-prometheus-stack-prometheus-0<span class="w">               </span><span class="m">2</span>/2<span class="w">     </span>Running<span class="w">   </span><span class="m">0</span><span class="w">          </span>2m40s
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>NAME<span class="w">                                                                                                   </span>STATUS<span class="w">   </span>CAPACITY<span class="w">   </span>STORAGECLASS
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>persistentvolumeclaim/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0<span class="w">   </span>Bound<span class="w">    </span>25Gi<span class="w">       </span>local-path
+</code></pre></div>
+<p>I cut the claim's <code>VOLUME</code>, <code>ACCESS MODES</code>, <code>VOLUMEATTRIBUTESCLASS</code> and <code>AGE</code> columns
+for width. The 25 Gi volume bound through local-path is what lets GPU metrics outlive
+the GPU node.</p>
+<h3 id="checking-the-dcgm-image-without-a-gpu">Checking the DCGM image without a GPU</h3>
+<p>Before renting a GPU, I ran the DCGM image the GPU Operator uses,
+<code>nvcr.io/nvidia/cloud-native/dcgm:4.6.0-1-ubuntu24.04</code>, on the control plane
+(<a href="https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-dcgm-image-check.txt"><code>session-b-dcgm-image-check.txt</code></a>):</p>
+<div class="terminal highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="o">==</span><span class="w"> </span>dcgmproftester<span class="w"> </span>binaries
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>/usr/bin/dcgmproftester12
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>/usr/bin/dcgmproftester13
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>...
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="o">==</span><span class="w"> </span>dcgmi<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--help<span class="w"> </span><span class="o">(</span>injection<span class="o">)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">   </span>dcgmi<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--host<span class="w"> </span>&lt;IP/FQDN&gt;<span class="w"> </span>--inject<span class="w"> </span>--gpuid<span class="w"> </span>&lt;gpuId&gt;<span class="w"> </span>-f<span class="w"> </span>&lt;fieldId&gt;<span class="w"> </span>-v
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">      </span>--inject<span class="w">                </span>Inject<span class="w"> </span>values<span class="w"> </span>into<span class="w"> </span>cache.
+</code></pre></div>
+<p><code>dcgmproftester</code> is there in CUDA 12 and CUDA 13 builds, and <code>dcgmi test</code> supports
+<code>--inject</code>. So B2 could generate real load without pulling another image, and the
+simulated XID was possible.</p>
+<p>My first version of the check also reported <code>FAIL  --no-dcgm-validation not found in
+its help</code>, which was wrong, and the bug was in my check, not the image. It printed
+nothing at all for either binary, not even <code>-d</code> and <code>-t</code>, so <code>--help</code> had never run.
+<code>dcgmproftester</code> links against <code>libcuda</code>, which only exists on a node with an NVIDIA
+driver; my check piped the loader error through <code>grep</code> and read the empty result as
+a missing flag. The script now shows the unfiltered output and the missing libraries,
+and reports that case as inconclusive. On the GPU node, <code>make load</code> checks the job 20
+seconds in, so a rejected flag would have cost 20 seconds rather than 10 minutes. The
+flag worked.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      &copy; 2026 <a href="https://github.com/yassineteimi" target="_blank" rel="noopener">Yassine TEIMI</a>
+
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        <div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/yassineteimi" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M186.1 328.7c0 20.9-10.9 55.1-36.7 55.1s-36.7-34.2-36.7-55.1 10.9-55.1 36.7-55.1 36.7 34.2 36.7 55.1M480 278.2c0 31.9-3.2 65.7-17.5 95-37.9 76.6-142.1 74.8-216.7 74.8-75.8 0-186.2 2.7-225.6-74.8-14.6-29-20.2-63.1-20.2-95 0-41.9 13.9-81.5 41.5-113.6-5.2-15.8-7.7-32.4-7.7-48.8 0-21.5 4.9-32.3 14.6-51.8 45.3 0 74.3 9 108.8 36 29-6.9 58.8-10 88.7-10 27 0 54.2 2.9 80.4 9.2 34-26.7 63-35.2 107.8-35.2 9.8 19.5 14.6 30.3 14.6 51.8 0 16.4-2.6 32.7-7.7 48.2 27.5 32.4 39 72.3 39 114.2m-64.3 50.5c0-43.9-26.7-82.6-73.5-82.6-18.9 0-37 3.4-56 6-14.9 2.3-29.8 3.2-45.1 3.2-15.2 0-30.1-.9-45.1-3.2-18.7-2.6-37-6-56-6-46.8 0-73.5 38.7-73.5 82.6 0 87.8 80.4 101.3 150.4 101.3h48.2c70.3 0 150.6-13.4 150.6-101.3m-82.6-55.1c-25.8 0-36.7 34.2-36.7 55.1s10.9 55.1 36.7 55.1 36.7-34.2 36.7-55.1-10.9-55.1-36.7-55.1"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://linkedin.com/in/yassine-teimi" target="_blank" rel="noopener" title="linkedin.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.7.1 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3M135.4 416H69V202.2h66.5V416zm-33.2-243c-21.3 0-38.5-17.3-38.5-38.5S80.9 96 102.2 96c21.2 0 38.5 17.3 38.5 38.5 0 21.3-17.2 38.5-38.5 38.5m282.1 243h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9z"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.tabs", "navigation.sections", "toc.integrate", "navigation.top", "search.suggest", "search.highlight", "content.tabs.link", "content.code.annotation", "content.code.copy"], "search": "../assets/javascripts/workers/search.6ce7567c.min.js", "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.88dd0f4e.min.js"></script>
+      
+    
+  </body>
+</html>

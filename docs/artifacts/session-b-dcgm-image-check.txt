@@ -1,0 +1,18 @@
+== image
+nvcr.io/nvidia/cloud-native/dcgm:4.6.0-1-ubuntu24.04
+== dcgmi version
+
+dcgmi  version: 4.6.0
+
+== dcgmproftester binaries
+/usr/bin/dcgmproftester12
+/usr/bin/dcgmproftester13
+== /usr/bin/dcgmproftester12 --help (flags B2 uses)
+== /usr/bin/dcgmproftester13 --help (flags B2 uses)
+== dcgmi test --help (injection)
+   dcgmi test --host <IP/FQDN> --introspect --gpuid <gpuId> -f <fieldId> 
+   dcgmi test --host <IP/FQDN> --inject --gpuid <gpuId> -f <fieldId> -v
+      --inject                Inject values into cache.
+      --gpuid      gpuId      The GPU/GPU-I/GPU-CI ID to query on the specified
+  -f  --field      fieldId    Field identifier to view/inject.
+  -v  --value      value      Value to inject.

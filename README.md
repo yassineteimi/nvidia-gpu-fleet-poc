@@ -30,7 +30,7 @@ and remediation.
 | --- | --- | --- |
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat I explain in the write-up, 2026-09-24 |
-| C | node-problem-detector, remediation controller, fault injection | Not started |
+| C | node-problem-detector, remediation controller, fault injection | Planned |
 | D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |
 
 ## What it covers

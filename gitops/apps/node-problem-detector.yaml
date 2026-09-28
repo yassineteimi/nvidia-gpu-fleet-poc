@@ -1,0 +1,36 @@
+# node-problem-detector with the GPU kernel log monitor, sync wave 3.
+#
+# Upstream's kustomization at v1.36.0 plus this repository's GPU monitor, from
+# gitops/manifests/node-problem-detector. It sets GPUUnhealthy on a node when
+# the kernel log shows a GPU fault XID; gpu-remediator (same wave) acts on it.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: node-problem-detector
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+    targetRevision: main
+    path: gitops/manifests/node-problem-detector
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kube-system
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

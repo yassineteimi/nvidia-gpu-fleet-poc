@@ -78,6 +78,19 @@ already makes it, in `internal/rm/health.go` at v0.20.0: 13, 31, 43, 45, 68 and 
 unhealthy. My alert rules draw the same line, so Prometheus and the scheduler can't
 disagree about whether a GPU is broken.
 
+### node-problem-detector freezes a condition's message
+
+Once a permanent condition is True with a given reason, node-problem-detector
+`v1.36.0` doesn't update its message, however many more matching lines arrive. My
+first design had one condition for every XID and let the controller classify the code
+from the message. An XID 13 (an application error) followed by an XID 79 would have
+left the message on 13, and the broken GPU would never have been drained. The fault
+or application split now lives in the rule, with a test that feeds 13 and then 79.
+
+Two more from the same reading: it trims every kernel log line, so a driver line
+ending in `79, ` arrives as `79,`, and its own deployment manifest at the `v1.36.0` tag
+still references image `v0.8.19`.
+
 ## GPU Operator and Node Feature Discovery
 
 ### Running NFD yourself means copying the operator's NFD settings

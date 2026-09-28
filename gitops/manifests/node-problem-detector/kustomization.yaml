@@ -1,0 +1,44 @@
+# node-problem-detector, from its own upstream kustomization at v1.36.0, with
+# three changes: the image, the GPU monitor, and the monitors it runs.
+#
+# There is no upstream Helm chart. The manifest at the v1.36.0 tag still
+# references image v0.8.19, so the image is set here to the release whose code
+# was read and tested (scripts/test-npd-rules.sh).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - https://github.com/kubernetes/node-problem-detector//deployment?ref=v1.36.0
+
+images:
+  - name: registry.k8s.io/node-problem-detector/node-problem-detector
+    newTag: v1.36.0
+
+configMapGenerator:
+  - name: node-problem-detector-config
+    namespace: kube-system
+    behavior: merge
+    files:
+      - gpu-monitor.json
+    options:
+      disableNameSuffixHash: true
+
+patches:
+  # Run the kernel monitor, the read-only filesystem monitor and the GPU
+  # monitor. Upstream's docker-monitor.json watches dockerd, which this
+  # cluster doesn't run.
+  - target:
+      kind: DaemonSet
+      name: node-problem-detector
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/command
+        value:
+          - /node-problem-detector
+          - --logtostderr
+          - --config.system-log-monitor=/config/kernel-monitor.json,/config/readonly-monitor.json,/config/gpu-monitor.json
+      - op: add
+        path: /spec/template/spec/volumes/3/configMap/items/-
+        value:
+          key: gpu-monitor.json
+          path: gpu-monitor.json

@@ -1,0 +1,34 @@
+# Moves to gitops/apps/gpu-remediator.yaml once the first image is built and
+# its digest is pinned in gitops/manifests/gpu-remediator/kustomization.yaml.
+# Until then ArgoCD would only be asked to pull an image that doesn't exist.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: gpu-remediator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "3"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+    targetRevision: main
+    path: gitops/manifests/gpu-remediator
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: gpu-remediator
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

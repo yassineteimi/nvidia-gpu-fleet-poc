@@ -1,0 +1,48 @@
+# One replica on the control plane. The controller must not run on the node it
+# may have to drain, and one replica with Recreate means two copies never race
+# to cordon the same node, which is what leader election would otherwise be for.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-remediator
+  namespace: gpu-remediator
+  labels:
+    app: gpu-remediator
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gpu-remediator
+  template:
+    metadata:
+      labels:
+        app: gpu-remediator
+    spec:
+      serviceAccountName: gpu-remediator
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: gpu-remediator
+          image: ghcr.io/yassineteimi/gpu-remediator
+          env:
+            - name: DRAIN_TIMEOUT_SECONDS
+              value: "300"
+            - name: RESYNC_SECONDS
+              value: "30"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 128Mi

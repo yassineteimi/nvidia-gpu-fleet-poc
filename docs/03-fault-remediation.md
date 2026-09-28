@@ -1,8 +1,8 @@
 # Session C: fault detection and remediation
 
-!!! info "Status: planned"
-    This page holds the plan and the acceptance test. I'll write the results
-    during the session, from captured output, as I did for Sessions A and B.
+!!! info "Status: C1 written and tested offline, not yet deployed"
+    The detector rule, the controller and the scripts exist and pass their tests.
+    Nothing has run on the cluster yet, and nothing has run on a GPU.
 
 **Scope:** node-problem-detector reads the kernel log for `NVRM: Xid` and sets a
 `GPUUnhealthy` node condition. A Python controller reacts: cordon, emit an event,
@@ -11,8 +11,8 @@ itself is injected and labelled as simulated.
 
 ```text
 echo "NVRM: Xid (PCI:0000:01:00): 79, ..." > /dev/kmsg        (simulated)
-  -> node-problem-detector, GPU kernel log rule
-  -> node condition GPUUnhealthy=True, reason carries the XID
+  -> node-problem-detector, GPU kernel log rule: a GPUXid Event for every XID,
+     and GPUUnhealthy=True (reason GPUXidFault) for fault XIDs only
   -> gpu-remediator: cordon, Event with the decoded XID, annotations, drain via the Eviction API
   -> make return-to-service NODE=...: dcgmi diag must pass, then clear the condition, then uncordon
 ```
@@ -46,7 +46,7 @@ echo "NVRM: Xid (PCI:0000:01:00): 79, ..." > /dev/kmsg        (simulated)
 | Decision | Choice | Why |
 |---|---|---|
 | Which XIDs cordon | Any XID except 13, 31, 43, 45, 68 and 109 | The device plugin's list in `internal/rm/health.go` at v0.20.0, the same one the Session B alerts use. Prometheus, the scheduler and the controller shouldn't disagree about whether a GPU is broken |
-| Where that decision lives | In the controller, not in the node-problem-detector regex | Go's regex engine has no negative lookahead, so "any code except these six" is ugly as a pattern and easy to get wrong. node-problem-detector reports every XID; the controller decides, and it has unit tests |
+| Where that decision lives | In the node-problem-detector rule, with the controller checking it again | My first plan put it in the controller. Reading node-problem-detector changed that: see below. Go's regex engine has no lookahead, so the rule spells out "any number except these six", and a test checks every code from 0 to 2000 |
 | Controller packaging | Image built by GitHub Actions for `linux/amd64`, pushed to ghcr.io, pinned by digest in Git | Looks like production, has no local build step, and avoids the Apple Silicon `exec format error` trap |
 | Diag level for return to service | `dcgmi diag -r 2`, configurable | A few minutes on a billed GPU. A real fleet would use level 3 or 4, and the runbook will say so |
 | node-problem-detector deployment | The upstream kustomization at tag `v1.36.0`, with the image overridden | There's no upstream Helm chart. The manifest at that tag still references image `v0.8.19`, so I set the image to the release I actually read |
@@ -73,12 +73,37 @@ that the condition is back to False, and only then uncordon. I'll keep the 5 min
 lost when node-problem-detector restarts. A level 2 diag takes a few minutes anyway,
 so the wait costs little.
 
-## Open questions for C1
+**One condition can't carry every XID.** Once a permanent condition is True with a
+given reason, node-problem-detector doesn't update its message again. If every XID
+fed one condition and the controller classified them, an XID 13 followed by an XID 79
+would leave the condition saying 13, and the node would never be drained. So the rule
+itself only sets `GPUUnhealthy` for fault XIDs, and a separate temporary rule emits a
+`GPUXid` Event for every XID, application errors included. The controller still
+checks the code, and refuses to drain if the condition ever names an application
+error.
 
-- The exact Xid line format with driver `595.91.07`, from NVIDIA's XID documentation,
-  so that the rule matches a real line and not just my injected one.
-- Whether `registry.k8s.io/node-problem-detector/node-problem-detector:v1.36.0` exists
-  and runs with the upstream manifest's flags.
+**The kernel log line gets trimmed.** node-problem-detector passes each kmsg line
+through `strings.TrimSpace`. When the driver has no message to add, its line ends in
+`79, `, which arrives as `79,`. A rule ending in `, .*` would miss it; the rule ends in
+`,.*`, and a test covers the bare line.
+
+## C1: what I wrote, and how I checked it
+
+| Piece | Where | How I checked it |
+|---|---|---|
+| The Xid line format | Read from `src/nvidia/src/kernel/gpu/rc/kernel_rc.c` at driver tag `595.91.07` | Three shapes: with a process, without one, and with MIG attribution inside the parenthesis. Every test uses them |
+| GPU monitor for node-problem-detector | `gitops/manifests/node-problem-detector/gpu-monitor.json` | Run through node-problem-detector's own `systemlogmonitor` package at `v1.36.0` (`make test-npd-rules`): every XID from 0 to 2000 classified like the device plugin, all three line shapes matched, non-Xid lines ignored, a fault after an application error still caught. Four deliberate breaks of the rule each failed a test |
+| node-problem-detector deployment | `gitops/manifests/node-problem-detector/`, `gitops/apps/node-problem-detector.yaml`, wave 3 | `kustomize build` renders the upstream base with the image at `v1.36.0`, the GPU monitor in the ConfigMap and the volume, and the flags running it |
+| `gpu-remediator` | `controllers/gpu-remediator/` | 40 `pytest` tests against a fake cluster (`make test-controller`): cordon before any eviction, DaemonSet, mirror and finished pods left alone, disruption budgets retried and never forced, non-GPU nodes refused, application XIDs never drained, no second cordon. Three deliberate breaks each failed a test |
+| Controller RBAC | `gitops/manifests/gpu-remediator/rbac.yaml` | Exactly the calls in `kube.py`. No pod delete, so it can't bypass a disruption budget, and no write to `nodes/status`, so it can't clear the condition |
+| Controller image | `.github/workflows/remediator-image.yml` | Not built yet: no Docker daemon where I wrote this. CI builds it for `linux/amd64` after the tests pass, and prints the digest to pin |
+| Scripts | `inject-xid.sh`, `return-to-service.sh`, `gpu-workload.sh`, `capture-c.sh` | `shellcheck`. The injected line has the driver's exact shape, and its message says SIMULATED, so the node's own kernel log says where it came from |
+
+## Still open
+
+- Whether `registry.k8s.io/node-problem-detector/node-problem-detector:v1.36.0` exists.
+  The registry isn't reachable from where I wrote this, and upstream promotes release
+  images by hand, so a git tag doesn't guarantee one. The first sync answers it.
 - How long `dcgmi diag -r 2` takes on an L4 running against the standalone host engine.
 - Whether 60 seconds holds. The cordon should take seconds; the drain waits for each
   pod's grace period, which is why criterion 2 is a measured time, not a limit.

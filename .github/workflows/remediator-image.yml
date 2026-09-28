@@ -1,0 +1,48 @@
+# Builds the gpu-remediator image for linux/amd64 and pushes it to ghcr.io.
+# The digest it prints is what gitops/manifests/gpu-remediator pins; the
+# cluster never runs a tag.
+name: remediator-image
+on:
+  push:
+    branches: [main]
+    paths:
+      - controllers/gpu-remediator/**
+      - .github/workflows/remediator-image.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      # No image for code whose tests fail.
+      - run: pip install -r requirements-dev.txt && python -m pytest -q
+        working-directory: controllers/gpu-remediator
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: controllers/gpu-remediator
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/yassineteimi/gpu-remediator:sha-${{ github.sha }}
+            ghcr.io/yassineteimi/gpu-remediator:main
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Digest to pin
+        run: |
+          echo "IMAGE_DIGEST=${{ steps.build.outputs.digest }}"
+          echo "Pin in gitops/manifests/gpu-remediator/kustomization.yaml: \`${{ steps.build.outputs.digest }}\`" >> "$GITHUB_STEP_SUMMARY"

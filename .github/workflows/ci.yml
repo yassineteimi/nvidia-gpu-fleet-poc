@@ -32,3 +32,26 @@ jobs:
             | tar xz -C /tmp
           echo "/tmp/prometheus-3.14.0.linux-amd64" >> "$GITHUB_PATH"
       - run: ./scripts/test-rules.sh
+
+  # The remediation controller's unit tests, with the pinned dependencies.
+  test-controller:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: controllers/gpu-remediator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements-dev.txt
+      - run: python -m pytest -q
+
+  # The node-problem-detector GPU monitor, run through node-problem-detector's
+  # own matching code at v1.36.0, whose go.mod asks for Go 1.26.5.
+  test-npd-rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.26.5" }
+      - run: ./scripts/test-npd-rules.sh

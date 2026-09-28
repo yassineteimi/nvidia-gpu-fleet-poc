@@ -1,0 +1,28 @@
+{
+    "plugin": "kmsg",
+    "logPath": "/dev/kmsg",
+    "lookback": "5m",
+    "bufferSize": 10,
+    "source": "gpu-xid-monitor",
+    "metricsReporting": true,
+    "conditions": [
+        {
+            "type": "GPUUnhealthy",
+            "reason": "NoGPUXidFault",
+            "message": "no GPU fault XID in the kernel log since node-problem-detector started"
+        }
+    ],
+    "rules": [
+        {
+            "type": "temporary",
+            "reason": "GPUXid",
+            "pattern": "NVRM: Xid \\(PCI:[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}[^)]*\\): \\d+,.*"
+        },
+        {
+            "type": "permanent",
+            "condition": "GPUUnhealthy",
+            "reason": "GPUXidFault",
+            "pattern": "NVRM: Xid \\(PCI:[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}[^)]*\\): (?:\\d|1[0-24-9]|3[02-9]|4[0-246-9]|6[0-79]|[25789]\\d|10[0-8]|1[1-9]\\d|[2-9]\\d\\d|[1-9]\\d{3,}),.*"
+        }
+    ]
+}

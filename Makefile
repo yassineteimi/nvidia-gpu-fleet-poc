@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: help cluster argocd argocd-ui grafana-ui check-dcgm-image gpu-images up acceptance load load-stop inject-xid-dcgm capture-b capture-b-history test-rules down cost burn-in docs docs-serve lint shellcheck fmt test
+.PHONY: help cluster argocd argocd-ui grafana-ui check-dcgm-image gpu-images up acceptance load load-stop inject-xid-dcgm capture-b capture-b-history test-rules workload workload-stop inject-xid return-to-service capture-c test-controller test-npd-rules down cost burn-in docs docs-serve lint shellcheck fmt test
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -42,6 +42,27 @@ capture-b:     ## Capture Session B evidence from Prometheus and Alertmanager
 
 capture-b-history: ## After make down: check the GPU's metrics history survived
 	./scripts/capture-b.sh history
+
+workload:      ## Start a GPU workload for Session C to evict
+	./scripts/gpu-workload.sh start
+
+workload-stop: ## Remove the Session C GPU workload
+	./scripts/gpu-workload.sh stop
+
+inject-xid:    ## SIMULATED: write an Xid line into a node's kernel log (NODE=, XID=)
+	./scripts/inject-xid.sh "$(NODE)" "$(XID)"
+
+return-to-service: ## Gated return to service: lookback, dcgmi diag, reset, uncordon (NODE=)
+	./scripts/return-to-service.sh "$(NODE)"
+
+capture-c:     ## Capture Session C evidence for a node (NODE=, LABEL=)
+	./scripts/capture-c.sh "$(NODE)" "$(LABEL)"
+
+test-controller: ## Unit tests for the remediation controller
+	cd controllers/gpu-remediator && python3 -m pytest -q
+
+test-npd-rules: ## Test the GPU monitor through node-problem-detector's own code (needs Go)
+	./scripts/test-npd-rules.sh
 
 down:          ## Drain the GPU node, remove it from the cluster, destroy it
 	./scripts/gpu-down.sh

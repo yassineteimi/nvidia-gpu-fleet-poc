@@ -52,6 +52,9 @@ class KubeCluster:
     def nodes(self):
         return [to_node(n) for n in self.core.list_node().items]
 
+    def node(self, name):
+        return to_node(self.core.read_node(name))
+
     def annotate(self, name, annotations):
         self.core.patch_node(name, {"metadata": {"annotations": annotations}})
 

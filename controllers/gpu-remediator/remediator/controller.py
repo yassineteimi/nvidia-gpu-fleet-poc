@@ -86,9 +86,17 @@ class Remediator:
     def reconcile(self, node):
         """Bring one node in line with its GPUUnhealthy condition. Returns a short
         word saying what it did, which the tests and the log both use."""
-        cond = node.conditions.get(CONDITION)
-        if cond is None or cond.status != "True" or cond.reason != FAULT_REASON:
+        if not self.unhealthy(node):
             return "healthy"
+        # A watch event can carry a copy of the node older than this controller's
+        # own last write. In Session C2, events queued during a drain arrived
+        # without the drained-at annotation, and one drain was announced three
+        # times. So a node that looks unhealthy is read again before anything
+        # is done to it.
+        node = self.cluster.node(node.name)
+        if not self.unhealthy(node):
+            return "healthy"
+        cond = node.conditions[CONDITION]
 
         if node.labels.get(GPU_LABEL) != "true":
             if ANN_REFUSED_AT in node.annotations:
@@ -118,6 +126,11 @@ class Remediator:
         if ANN_DRAINED_AT not in node.annotations:
             return self.drain(node)
         return "remediated"
+
+    @staticmethod
+    def unhealthy(node):
+        cond = node.conditions.get(CONDITION)
+        return cond is not None and cond.status == "True" and cond.reason == FAULT_REASON
 
     def cordon(self, node, cond, parsed):
         what = xid.describe(parsed[1]) if parsed else "an XID the controller could not parse"

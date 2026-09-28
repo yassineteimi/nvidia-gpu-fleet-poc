@@ -1,0 +1,2 @@
+xid_injected=2026-09-28T19:54:04Z node=gpu-fleet-cp-01 xid=79 simulated=true
+returned_to_service=2026-09-28T20:05:32Z node=gpu-fleet-cp-01 gpu_node=false diag_level=2

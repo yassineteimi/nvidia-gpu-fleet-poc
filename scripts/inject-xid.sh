@@ -40,10 +40,12 @@ PCI="${PCI:-0000:01:00}"
 LINE="NVRM: Xid (PCI:$PCI): $XID, pid=0, name=inject-xid.sh, SIMULATED by scripts/inject-xid.sh, not a real fault"
 
 log "SIMULATED: writing XID $XID for PCI $PCI into the kernel log of $NODE"
-node_ssh "$HOST" "echo '<3>$LINE' > /dev/kmsg"
-# GNU date gives milliseconds; macOS date prints "%3N" literally, so fall back.
-at="$(date -u +%Y-%m-%dT%H:%M:%S.%3NZ)"
-case "$at" in *N*) at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" ;; esac
+# The injection time comes from the node's own clock, in the same command as the
+# write, so it can be compared with the controller's annotations (another
+# NTP-synced node) and not with this laptop. Not from the condition either: its
+# lastTransitionTime is derived from the kernel's uptime counter, and on the
+# control plane, six days after boot, it read 4 seconds early.
+at="$(node_ssh "$HOST" "echo '<3>$LINE' > /dev/kmsg && date -u +%Y-%m-%dT%H:%M:%S.%3NZ")"
 mkdir -p "$(dirname "$TIMELINE")"
 echo "xid_injected=$at node=$NODE xid=$XID simulated=true" | tee -a "$TIMELINE"
 node_ssh "$HOST" "dmesg | grep 'NVRM: Xid' | tail -1"

@@ -47,7 +47,7 @@ mkdir -p "$(dirname "$OUT")"
     -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,PHASE:.status.phase,OWNER:.metadata.ownerReferences[0].kind'
 
   echo "== the workload"
-  kubectl_cp -n gpu-work get pods -o wide 2>/dev/null || echo "no workload namespace"
+  kubectl_cp -n gpu-work get pods -o wide 2>&1 | grep -v '^No resources found' || echo "no workload pods"
 
   echo "== gpu-remediator log, last 20 lines"
   kubectl_cp -n gpu-remediator logs deploy/gpu-remediator --tail=20 2>&1 || true

@@ -24,6 +24,39 @@ The main item: the GPU never actually failed. In Session B I injected an XID int
 to test alerting, and in Session C I wrote them into the node's kernel log to test
 detection and remediation.
 
+## Architecture
+
+```mermaid
+flowchart LR
+  laptop["Operator laptop<br/>make, terraform, kubectl"]
+  scw["Scaleway API"]
+  gh["GitHub<br/>this repository"]
+  ci["GitHub Actions<br/>tests, controller image"]
+  reg["Container registries<br/>nvcr.io, registry.k8s.io,<br/>quay.io, ghcr.io, docker.io"]
+
+  subgraph cluster["kubeadm cluster in Scaleway fr-par-2"]
+    direction TB
+    cp["gpu-fleet-cp-01<br/>control plane, always on<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator"]
+    gpu["gpu-fleet-gpu-01<br/>NVIDIA L4, per session<br/>driver, device plugin, DCGM,<br/>node-problem-detector"]
+    cp <-->|"API, pod network"| gpu
+  end
+
+  laptop -->|"terraform apply"| scw
+  scw -->|"creates nodes"| cluster
+  laptop -->|"kubectl on 6443"| cp
+  laptop -->|"git push"| gh
+  gh -->|"on push"| ci
+  ci -->|"image, pinned by digest"| reg
+  cp -->|"ArgoCD pulls manifests"| gh
+  cluster -.->|"pull images"| reg
+
+  classDef nv fill:#76b900,stroke:#4a7300,color:#000
+  class gpu nv
+```
+
+Every component on both nodes, the network, and the order ArgoCD deploys things in are
+on the [architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/architecture/).
+
 ## Build status
 
 | Session | Scope | Status |

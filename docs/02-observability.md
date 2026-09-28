@@ -10,6 +10,49 @@
 utilisation, framebuffer, temperature, power, ECC, clock event reasons and XID.
 Alert rules cover critical XIDs and a job's utilisation collapsing.
 
+## The telemetry path
+
+```mermaid
+flowchart LR
+  subgraph gpu["GPU node"]
+    direction TB
+    load["gpu-load Job<br/>dcgmproftester13, tensor load"]
+    l4["NVIDIA L4"]
+    dcgm["nvidia-dcgm<br/>host engine, port 5555"]
+    exp["nvidia-dcgm-exporter<br/>34 counters"]
+    load -->|"real load"| l4
+    dcgm -->|"NVML"| l4
+    exp -->|"field values"| dcgm
+    inj["dcgmi test --inject<br/>field 230 = 79"] -.->|"simulated XID"| dcgm
+  end
+
+  subgraph cp["control plane, monitoring namespace"]
+    direction TB
+    prom["Prometheus v3.14.0<br/>15 days, 25Gi PVC"]
+    rules["PrometheusRule gpu-fleet<br/>9 rules, 12 promtool tests"]
+    am["Alertmanager<br/>null receiver"]
+    graf["Grafana<br/>gpu-fleet dashboard, 21 panels"]
+    rules --> prom
+    prom -->|"firing alerts"| am
+    graf -->|"PromQL"| prom
+  end
+
+  git[("Git: counter ConfigMap,<br/>rules, dashboard JSON")]
+
+  prom -->|"ServiceMonitor scrape"| exp
+  git -.->|"ArgoCD"| exp
+  git -.->|"ArgoCD"| rules
+  git -.->|"ArgoCD"| graf
+
+  classDef nv fill:#76b900,stroke:#4a7300,color:#000
+  class l4,dcgm,exp nv
+```
+
+Everything the GPU node reports passes through two hops: the standalone DCGM host
+engine reads the L4 through NVML, and the exporter reads the host engine. The counter
+list, the alert rules and the dashboard all come from Git, so none of them lives only
+in a UI.
+
 ## Results
 
 | # | Acceptance criterion | Result | Evidence |
@@ -26,6 +69,30 @@ Alert rules cover critical XIDs and a job's utilisation collapsing.
 All times are UTC, taken from the files in `docs/artifacts/`. Prometheus's `ALERTS`
 series was read back at a 15 second step, so the alert times are accurate to 15
 seconds. The Alertmanager times are exact.
+
+```mermaid
+gantt
+  title Session B, 2026-09-24 (UTC)
+  dateFormat HH:mm:ss
+  axisFormat %H:%M
+  section Exporter
+    DCGMExporterDown pending         :13:13:48, 13:14:33
+    DCGMExporterRestarting firing    :crit, 13:15:18, 13:29:03
+  section Load
+    tensor load, 20 min requested    :active, 13:23:14, 13:43:00
+  section Power
+    GPUPowerThrottling pending       :13:26:18, 13:41:18
+    GPUPowerThrottling firing        :crit, 13:41:18, 13:45:33
+  section Collapse
+    GPUUtilisationCollapse pending   :13:46:03, 13:47:03
+    GPUUtilisationCollapse firing    :crit, 13:47:03, 13:53:18
+  section XID (simulated)
+    GPUXidCritical firing            :crit, 13:50:33, 13:53:18
+```
+
+Red bars are alerts firing; the others are alerts pending, and the load itself. The
+capture ran at 13:53, so the last two bars stop there rather than where the alerts
+resolved.
 
 | Time | Event |
 |---|---|

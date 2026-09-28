@@ -13,12 +13,27 @@
 recording an Event, annotating and draining the node. Putting a node back into
 service is a separate command, gated on `dcgmi diag`.
 
-```text
-echo "NVRM: Xid (PCI:0000:01:00): 79, ..." > /dev/kmsg        (simulated)
-  -> node-problem-detector, GPU kernel log rule: a GPUXid Event for every XID,
-     and GPUUnhealthy=True (reason GPUXidFault) for fault XIDs only
-  -> gpu-remediator: cordon, Event with the decoded XID, annotations, drain via the Eviction API
-  -> make return-to-service NODE=...: wait out the lookback, dcgmi diag, reset the detector, uncordon
+Here's the first XID 79 on the GPU node, with the times I measured. The injection
+time is from the GPU node's clock and the rest from the controller's annotations.
+
+```mermaid
+sequenceDiagram
+  participant inj as inject-xid.sh
+  participant kmsg as GPU node kernel log
+  participant npd as node-problem-detector
+  participant api as kube-apiserver
+  participant gr as gpu-remediator
+  participant wl as GPU workload
+
+  inj->>kmsg: 20:32:46.293 write NVRM Xid 79 line (SIMULATED)
+  kmsg->>npd: rule match within 1 ms
+  npd->>api: GPUUnhealthy=True, reason GPUXidFault, plus a GPUXid Event
+  api->>gr: watch event
+  gr->>api: re-read the node, check it's a GPU node and a fault XID
+  gr->>api: 20:32:46.409 cordon, Event naming XID 79 (+0.12 s)
+  gr->>api: evict pods through the Eviction API
+  api->>wl: pod evicted, kubelet sends SIGTERM, replacement Pending
+  gr->>api: 20:32:48.759 drained-at annotation (+2.47 s)
 ```
 
 ## Results
@@ -53,6 +68,32 @@ I'd treat the sub-second figures as good to a few hundred milliseconds.
 | 20:40:43 | Uncordoned. The pending pod was scheduled back onto the node |
 | 20:49:26.839 | **XID 79** again, to see the early refusal. Cordoned at 20:49:27.704, drained at 20:49:30.028 |
 | 20:49:44 | Return to service, run inside the lookback, refused: the node was still cordoned in the capture right after it |
+
+## The way back into service
+
+Nothing uncordons a node on its own. `make return-to-service` runs these gates in
+order and stops at the first one that fails, leaving the node cordoned.
+
+```mermaid
+stateDiagram-v2
+  direction LR
+  [*] --> Cordoned: GPU fault XID
+  Cordoned --> Lookback: make return-to-service
+  Lookback --> Refused: XID less than 5 min old
+  Lookback --> Diag: 5 min have passed
+  Diag --> Refused: dcgmi diag -r 2 fails
+  Diag --> ResetDetector: diag passes
+  ResetDetector --> Refused: GPUUnhealthy still True
+  ResetDetector --> InService: GPUUnhealthy=False, uncordon
+  Refused --> Cordoned: logged in the timeline
+  InService --> [*]
+```
+
+The session ran the success path, where the diag passed in 6 seconds and the workload
+went back onto the node, and the lookback refusal. It never ran the diag-failure
+refusal, because the L4 was healthy. The reset step restarts node-problem-detector on
+the node, which is the only way its condition goes back to False; the section on
+reading node-problem-detector, further down, explains why.
 
 ## What the XID 13 then XID 79 order was for
 

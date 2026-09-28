@@ -96,6 +96,35 @@ and answered most of my open questions without renting a GPU. On 2026-09-24 the 
 node was created, joined, given its driver by the GPU Operator, passed acceptance, and
 was destroyed.
 
+This is what `make up` and `make acceptance` do, in order. Nobody logs into the GPU
+node at any point; the only SSH is the script fetching a join command from the control
+plane.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor me as make up
+  participant tf as Terraform, Scaleway API
+  participant gpu as GPU node, cloud-init
+  participant cp as control plane
+  participant nfd as Node Feature Discovery
+  participant op as GPU Operator
+
+  me->>tf: gpu_node_enabled = true, apply (plan guard: only the GPU node may change)
+  tf->>gpu: L4-1-24G, kapsule_noble, private NIC on 172.16.32.20
+  gpu->>gpu: record the image inventory, stop if any NVIDIA driver is present
+  gpu->>gpu: containerd, kubelet and kubeadm 1.36.4-1.1
+  me->>cp: SSH: kubeadm token create --ttl 30m --print-join-command
+  me->>gpu: run the join command
+  gpu->>cp: kubeadm join 172.16.32.10:6443, node Ready
+  nfd->>cp: label feature.node.kubernetes.io/pci-10de.present=true
+  cp-->>op: a node now matches the GPU Operator's selectors
+  op->>gpu: driver DaemonSet builds 595.91.07 for kernel 6.8.0-136
+  op->>gpu: container toolkit, device plugin, DCGM, validators
+  gpu->>cp: allocatable nvidia.com/gpu: 1
+  me->>cp: make acceptance: cuda-vectoradd prints Test PASSED
+```
+
 ### Control plane and ArgoCD
 
 `make cluster` created the Private Network and the control plane and returned a

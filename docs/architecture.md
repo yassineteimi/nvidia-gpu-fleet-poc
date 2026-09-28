@@ -1,77 +1,270 @@
 # Architecture
 
-Two nodes running upstream Kubernetes through kubeadm, with no vendor distribution.
+Two Scaleway instances running upstream Kubernetes through kubeadm, with no vendor
+distribution. The control plane stays up; the GPU node exists only during a session.
+Every diagram on this page shows what's deployed today, taken from the pod lists
+captured in `docs/artifacts/`.
+
+## The whole picture
 
 ```mermaid
 flowchart LR
-  subgraph PN["Scaleway private network, fr-par-2, 172.16.32.0/22"]
-    CP["gpu-fleet-cp-01, persistent<br/>PLAY2-MICRO, Ubuntu 22.04<br/>172.16.32.10 reserved in IPAM<br/>kubeadm control plane, etcd<br/>ArgoCD, Prometheus, Grafana<br/>gpu-remediator"]
-    GPU["gpu-fleet-gpu-01, ephemeral<br/>L4-1-24G, kapsule_noble, Ubuntu 24.04<br/>172.16.32.20 reserved in IPAM<br/>NFD, GPU Operator, DCGM<br/>node-problem-detector<br/>workloads"]
+  laptop["Operator laptop<br/>make, terraform, kubectl"]
+  scw["Scaleway API"]
+  gh["GitHub<br/>this repository"]
+  ci["GitHub Actions<br/>tests, controller image"]
+  reg["Container registries<br/>nvcr.io, registry.k8s.io,<br/>quay.io, ghcr.io, docker.io"]
+
+  subgraph cluster["kubeadm cluster in Scaleway fr-par-2"]
+    direction TB
+    cp["gpu-fleet-cp-01<br/>control plane, always on<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator"]
+    gpu["gpu-fleet-gpu-01<br/>NVIDIA L4, per session<br/>driver, device plugin, DCGM,<br/>node-problem-detector"]
+    cp <-->|"API, pod network"| gpu
   end
-  GIT["GitHub: this repository"] -->|"ArgoCD pulls"| CP
-  CP <-->|"kubeadm join, Flannel VXLAN"| GPU
+
+  laptop -->|"terraform apply"| scw
+  scw -->|"creates nodes"| cluster
+  laptop -->|"kubectl on 6443"| cp
+  laptop -->|"git push"| gh
+  gh -->|"on push"| ci
+  ci -->|"image, pinned by digest"| reg
+  cp -->|"ArgoCD pulls manifests"| gh
+  cluster -.->|"pull images"| reg
+
+  classDef nv fill:#76b900,stroke:#4a7300,color:#000
+  class gpu nv
 ```
+
+A person does two things by hand: `terraform apply` through the `make` targets, and
+`git push`. Everything that runs in the cluster, the GPU driver included, comes from
+ArgoCD reading this repository.
+
+## Network
+
+```mermaid
+flowchart TB
+  admin["Admin IP ranges<br/>(admin_cidrs)"]
+
+  subgraph pub["Public side: security groups, inbound default drop"]
+    direction LR
+    cpip["cp-01 flexible IP<br/>allows 22, 6443"]
+    gpuip["gpu-01 flexible IP<br/>allows 22"]
+  end
+
+  subgraph pn["Private Network 172.16.32.0/22"]
+    direction LR
+    cp["gpu-fleet-cp-01<br/>172.16.32.10, reserved in IPAM<br/>API server advertises here<br/>pods 10.244.0.0/24"]
+    gpu["gpu-fleet-gpu-01<br/>172.16.32.20, reserved in IPAM<br/>pods: a /24 from 10.244.0.0/16"]
+    gpu -->|"kubeadm join,<br/>kubelet to API on 6443"| cp
+    cp <-.->|"Flannel VXLAN,<br/>pinned with --iface-can-reach"| gpu
+  end
+
+  admin -->|"SSH, kubectl"| cpip
+  admin -->|"SSH"| gpuip
+  cpip --- cp
+  gpuip --- gpu
+```
+
+Both private addresses exist in IPAM before either node boots. The control plane
+needs its API server address up front: it's the `kubeadm init` advertise address, a
+certificate SAN, and the endpoint the GPU node joins through a week later. Each node
+tries DHCP on its private NIC first and only sets the reserved address statically if
+DHCP hasn't delivered it (it always has, so far).
+
+Flannel would pick the interface with the default route, which is the public one, so
+the bootstrap pins it with `--iface-can-reach` to the control plane's private address.
+`node_ip_mode` can move the whole cluster onto public addresses with one variable, in
+case the Private Network ever misbehaves.
+
+## What runs on the control plane
+
+Every pod on `gpu-fleet-cp-01`, grouped by namespace. The groups never call each
+other; each one reads and writes objects through the API server at the bottom.
+The kubelet and containerd run on the host, not as pods.
+
+```mermaid
+flowchart TB
+  subgraph argo["argocd: GitOps"]
+    direction LR
+    as["server, UI"]
+    actl["application-controller"] --- arepo["repo-server"]
+    actl --- redis[("redis")]
+    aset["applicationset-controller"]
+  end
+
+  subgraph mon["monitoring: kube-prometheus-stack"]
+    direction LR
+    pop["Prometheus Operator"] -->|"config, rules"| prom["Prometheus v3.14.0"]
+    prom --- pvc[("25Gi PVC<br/>local-path")]
+    prom -->|"alerts"| am["Alertmanager"]
+    graf["Grafana"] -->|"queries"| prom
+    ksm["kube-state-metrics"]
+  end
+
+  subgraph fleet["GPU fleet controllers, one namespace each"]
+    direction LR
+    gop["gpu-operator<br/>GPU Operator v26.7.0"]
+    nfdm["node-feature-discovery<br/>nfd-master, nfd-gc"]
+    gr["gpu-remediator"]
+    lpp["local-path-storage<br/>local-path-provisioner"]
+  end
+
+  subgraph every["on every node, this one included"]
+    direction LR
+    kubelet["host: kubelet 1.36.4,<br/>containerd 2.3.5"]
+    ds["DaemonSets: kube-proxy, kube-flannel,<br/>node-exporter, nfd-worker,<br/>node-problem-detector"]
+  end
+
+  subgraph ks["kube-system: the Kubernetes control plane"]
+    direction LR
+    sch["kube-scheduler"] --> api["kube-apiserver<br/>172.16.32.10:6443"]
+    kcm["kube-controller-manager"] --> api
+    api --- etcd[("etcd")]
+    dns["coredns x2"]
+  end
+
+  argo -->|"applies what's in Git"| ks
+  mon -->|"watches pods, services, CRDs"| ks
+  fleet -->|"labels, DaemonSets, cordons,<br/>evictions, volumes"| ks
+  every -->|"node status, conditions"| ks
+```
+
+## What runs on the GPU node
+
+The NVIDIA stack is built up in layers, each started by the GPU Operator once the one
+below it validates.
+
+```mermaid
+flowchart TB
+  subgraph hw["hardware"]
+    l4["NVIDIA L4, PCI 0000:01:00, 24 GB"]
+  end
+
+  subgraph host["host: kapsule_noble, Ubuntu 24.04"]
+    kmsg[/"kernel log, /dev/kmsg"/]
+    kubelet["kubelet 1.36.4"]
+    ctrd["containerd"]
+  end
+
+  subgraph gpuop["gpu-operator namespace"]
+    drv["nvidia-driver-daemonset<br/>builds and loads 595.91.07"]
+    tk["nvidia-container-toolkit<br/>configures containerd"]
+    val["operator-validator,<br/>cuda-validator"]
+    dp["nvidia-device-plugin<br/>advertises nvidia.com/gpu"]
+    gfd["gpu-feature-discovery<br/>nvidia.com/* labels"]
+    dcgm["nvidia-dcgm<br/>host engine, port 5555"]
+    dcgme["nvidia-dcgm-exporter<br/>34 counters from Git"]
+  end
+
+  subgraph other["other namespaces"]
+    npd["node-problem-detector<br/>GPU XID rule"]
+    nfdw["nfd-worker"]
+    ne["node-exporter"]
+    kp["kube-proxy, kube-flannel"]
+    work["GPU workloads"]
+  end
+
+  drv -->|"kernel module"| l4
+  tk -->|"nvidia runtime"| ctrd
+  val -.->|"checks"| drv
+  dp -->|"device list"| kubelet
+  dcgm -->|"NVML"| l4
+  dcgme -->|"reads fields"| dcgm
+  gfd -->|"reads GPU"| l4
+  npd -->|"reads"| kmsg
+  drv -.->|"Xid lines"| kmsg
+  work -->|"nvidia.com/gpu: 1"| kubelet
+
+  classDef nv fill:#76b900,stroke:#4a7300,color:#000
+  class drv,tk,val,dp,gfd,dcgm,dcgme nv
+```
+
+## How the two nodes work together
+
+Apart from Prometheus scraping them, the GPU node's components never call a control
+plane component directly. They go through the API server: one component writes an
+object, and another is watching for it. Steps 1 to 8 are how a new GPU node becomes
+schedulable, which Session A ran; A to C are the fault path from Session C.
+
+```mermaid
+flowchart LR
+  subgraph gpu["GPU node"]
+    nfdw["nfd-worker"]
+    dp["device plugin"]
+    kubelet["kubelet"]
+    npd["node-problem-detector"]
+    dcgme["dcgm-exporter"]
+  end
+
+  subgraph cp["control plane"]
+    api["kube-apiserver"]
+    nfdm["nfd-master"]
+    gop["GPU Operator"]
+    sch["kube-scheduler"]
+    gr["gpu-remediator"]
+    prom["Prometheus"]
+  end
+
+  nfdw -->|"1. NodeFeature: PCI vendor 10de"| api
+  api -->|"2. watch"| nfdm
+  nfdm -->|"3. label pci-10de.present=true"| api
+  api -->|"4. label matches"| gop
+  gop -->|"5. driver, toolkit, plugin, DCGM"| api
+  dp -->|"6. nvidia.com/gpu: 1"| kubelet
+  kubelet -->|"7. allocatable GPU"| api
+  sch -->|"8. binds GPU pods"| api
+  npd -->|"A. GPUUnhealthy=True"| api
+  api -->|"B. watch event"| gr
+  gr -->|"C. cordon, Event, evictions"| api
+  prom -->|"scrape"| dcgme
+```
+
+## GitOps: what ArgoCD applies, and in what order
+
+```mermaid
+flowchart LR
+  root["root<br/>app of apps"]
+  w_1["wave -1<br/>local-path-provisioner"]
+  w0["wave 0<br/>node-feature-discovery<br/>kube-prometheus-stack"]
+  w1["wave 1<br/>gpu-operator"]
+  w2["wave 2<br/>gpu-observability:<br/>alert rules, dashboard"]
+  w3["wave 3<br/>node-problem-detector<br/>gpu-remediator"]
+
+  root --> w_1 --> w0 --> w1 --> w2 --> w3
+```
+
+Each Application has two sources: the upstream chart, untouched and pinned, and this
+repository as a `ref` for the values file. A wave only starts once the previous one
+is healthy, which works only because my ArgoCD values restore the health check for
+`Application` resources that ArgoCD dropped in 1.8 ([Findings](findings.md)). Three
+orderings matter:
+
+- storage before anything that asks for a volume;
+- kube-prometheus-stack before the GPU Operator, whose ServiceMonitor for the DCGM
+  exporter needs the Prometheus Operator's CRDs;
+- Node Feature Discovery before the GPU Operator, which selects nodes on NFD's labels.
+
+I run NFD as its own Application, with `nfd.enabled=false` in the GPU Operator values,
+so the labels that drive GPU scheduling are pinned in Git rather than a side effect
+of another chart.
 
 ## Why split the nodes this way
 
 The GPU node holds nothing stateful, so I destroy it at the end of every session. That
-teardown is a real node lifecycle event: the same cordon, drain and remove the
-remediation controller will run when a GPU goes bad, so by the time I write that
-controller, the path underneath it has run every session.
-
-The control plane stays up because Prometheus history has to survive between weekly
-sessions. Session D measures goodput across an interrupted training run and records a
-multi-hour burn-in, and neither works with a metrics store that resets. In Session B,
-193 GPU samples were still queryable after the GPU node was gone.
-
-## Addressing
-
-I reserve both private addresses in IPAM before either node exists. The control plane
-needs its API server address before it boots: it's the `kubeadm init` advertise
-address, a certificate SAN, and the endpoint the GPU node joins through a week later.
-With a reservation, that address is a Terraform variable instead of something to
-discover.
-
-Each node still tries DHCP on its private NIC first, and only sets the reserved
-address statically if DHCP hasn't delivered it. `node_ip_mode` switches the whole
-cluster to public addressing with one variable, in case the Private Network gives
-trouble on the day.
+teardown is a real node lifecycle event, the same cordon, drain and remove the
+remediation controller runs when a GPU goes bad. The control plane stays up because
+Prometheus history has to survive between sessions: after Session B's GPU node was
+gone, its 193 samples were still there.
 
 ## Joining the GPU node
 
-`scripts/gpu-up.sh` applies the GPU node with Terraform, waits for its bootstrap to
-finish, asks the control plane for a fresh join command, and runs it on the new node:
+`scripts/gpu-up.sh` applies the GPU node with Terraform, waits for its bootstrap, asks
+the control plane for a fresh join command, and runs it on the new node:
 
 ```{ .sh .terminal }
 $ ssh root@cp-01 'kubeadm token create --ttl 30m --print-join-command'
 ```
 
 No bootstrap token is committed to Git, and I don't use
-`--discovery-token-unsafe-skip-ca-verification`, since the CA hash comes back in the
-same printed command. The token is created on demand and expires after 30 minutes.
-
-## GitOps layout
-
-ArgoCD runs an app of apps. Each component is an `Application` with two sources: the
-upstream Helm chart, and this repository as a `ref`, so the values file sits in Git
-with everything else.
-
-| Wave | Components | Status |
-|---|---|---|
-| -1 | local-path-provisioner | Running |
-| 0 | Node Feature Discovery, kube-prometheus-stack | Running |
-| 1 | GPU Operator | Running |
-| 2 | GPU alert rules and the Grafana dashboard | Running |
-| 3 | node-problem-detector, gpu-remediator | Running |
-| 4 | Tenant namespaces and quotas | Session D |
-
-kube-prometheus-stack is in wave 0 rather than wave 1 because the GPU Operator's
-ServiceMonitor for the DCGM exporter needs the Prometheus Operator's CRDs first. Each
-wave waits for the previous one to be healthy only because my ArgoCD values restore
-the health check for `Application` resources that ArgoCD dropped in 1.8
-([Findings](findings.md)).
-
-Node Feature Discovery runs as its own `Application`, with `nfd.enabled=false` in the
-GPU Operator values. The operator can bring its own NFD, but running it separately
-keeps the labels that drive GPU scheduling visible and pinned in Git, not a side
-effect of another chart.
+`--discovery-token-unsafe-skip-ca-verification`; the CA hash comes back in the same
+printed command, and the token expires after 30 minutes.

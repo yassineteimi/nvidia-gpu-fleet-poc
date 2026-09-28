@@ -1,6 +1,6 @@
-# Moves to gitops/apps/gpu-remediator.yaml once the first image is built and
-# its digest is pinned in gitops/manifests/gpu-remediator/kustomization.yaml.
-# Until then ArgoCD would only be asked to pull an image that doesn't exist.
+# The remediation controller, sync wave 3, beside node-problem-detector whose
+# GPUUnhealthy condition it acts on. The image is pinned by digest in
+# gitops/manifests/gpu-remediator/kustomization.yaml.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

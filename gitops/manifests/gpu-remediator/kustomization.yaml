@@ -7,8 +7,8 @@ resources:
   - rbac.yaml
   - deployment.yaml
 
-# Pinned by digest, from the image .github/workflows/remediator-image.yml built
-# and printed. Updated by a commit, like every other version in this repository.
+# Pinned by digest: the image built from 0643e27 by the remediator-image workflow,
+# run 36428136773. Updated by a commit, like every other version in this repository.
 images:
   - name: ghcr.io/yassineteimi/gpu-remediator
-    digest: sha256:0000000000000000000000000000000000000000000000000000000000000000
+    digest: sha256:d2ea4bd428a7bd6acba46bf57d8ffaa7a857dadd3de13eebe7ff28e935785e53

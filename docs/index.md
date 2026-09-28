@@ -1,7 +1,7 @@
 # GPU fleet operations on upstream Kubernetes
 
 I take a rented NVIDIA L4 from a bare cloud instance to a GPU node that ArgoCD
-manages, Prometheus monitors and, from Session C on, a controller remediates. Then I
+manages, Prometheus monitors and a controller remediates. Then I
 destroy it and rebuild it from Git. All of it ran on real hardware. The terminal
 output on these pages was captured during the sessions and links back to files in
 `docs/artifacts/`.
@@ -15,7 +15,7 @@ output on these pages was captured during the sessions and links back to files i
 - A measured goodput figure for a training job that gets interrupted, plus an
   acceptance runbook with exit criteria.
 
-Sessions A and B are done. C and D aren't, and the table below is the only place I
+Sessions A, B and C are done. D isn't, and the table below is the only place I
 claim progress.
 
 ## Build status
@@ -24,11 +24,14 @@ claim progress.
 |---|---|---|
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat, 2026-09-24 |
-| C | node-problem-detector, remediation controller, fault injection | Planned, see [Session C](03-fault-remediation.md) |
+| C | node-problem-detector, remediation controller, fault injection | **Done.** Five of six criteria passed outright, one on two of its three paths, 2026-09-28 |
 | D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |
 
 ## Worth reading first
 
+- [Session C](03-fault-remediation.md): an injected XID 79 cordons the L4 node in 0.12
+  seconds and drains it in 2.5, and the design changed twice because of what
+  node-problem-detector's source says.
 - [Session B](02-observability.md): a real power-throttling alert on the L4, a
   simulated XID 79 traced from DCGM to Alertmanager in 32 seconds, and a load job
   that didn't quite get killed.

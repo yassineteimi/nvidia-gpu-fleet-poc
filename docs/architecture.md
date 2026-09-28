@@ -1,13 +1,12 @@
 # Architecture
 
 Two nodes running upstream Kubernetes through kubeadm, with no vendor distribution.
-Items marked *(C)* arrive in Session C and don't exist yet.
 
 ```mermaid
 flowchart LR
   subgraph PN["Scaleway private network, fr-par-2, 172.16.32.0/22"]
-    CP["gpu-fleet-cp-01, persistent<br/>PLAY2-MICRO, Ubuntu 22.04<br/>172.16.32.10 reserved in IPAM<br/>kubeadm control plane, etcd<br/>ArgoCD, Prometheus, Grafana<br/>gpu-remediator (C)"]
-    GPU["gpu-fleet-gpu-01, ephemeral<br/>L4-1-24G, kapsule_noble, Ubuntu 24.04<br/>172.16.32.20 reserved in IPAM<br/>NFD, GPU Operator, DCGM<br/>node-problem-detector (C)<br/>workloads"]
+    CP["gpu-fleet-cp-01, persistent<br/>PLAY2-MICRO, Ubuntu 22.04<br/>172.16.32.10 reserved in IPAM<br/>kubeadm control plane, etcd<br/>ArgoCD, Prometheus, Grafana<br/>gpu-remediator"]
+    GPU["gpu-fleet-gpu-01, ephemeral<br/>L4-1-24G, kapsule_noble, Ubuntu 24.04<br/>172.16.32.20 reserved in IPAM<br/>NFD, GPU Operator, DCGM<br/>node-problem-detector<br/>workloads"]
   end
   GIT["GitHub: this repository"] -->|"ArgoCD pulls"| CP
   CP <-->|"kubeadm join, Flannel VXLAN"| GPU
@@ -63,7 +62,7 @@ with everything else.
 | 0 | Node Feature Discovery, kube-prometheus-stack | Running |
 | 1 | GPU Operator | Running |
 | 2 | GPU alert rules and the Grafana dashboard | Running |
-| 3 | node-problem-detector, gpu-remediator | Session C |
+| 3 | node-problem-detector, gpu-remediator | Running |
 | 4 | Tenant namespaces and quotas | Session D |
 
 kube-prometheus-stack is in wave 0 rather than wave 1 because the GPU Operator's

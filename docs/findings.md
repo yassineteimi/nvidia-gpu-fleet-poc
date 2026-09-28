@@ -78,6 +78,8 @@ already makes it, in `internal/rm/health.go` at v0.20.0: 13, 31, 43, 45, 68 and 
 unhealthy. My alert rules draw the same line, so Prometheus and the scheduler can't
 disagree about whether a GPU is broken.
 
+## node-problem-detector and the remediation controller
+
 ### node-problem-detector freezes a condition's message
 
 Once a permanent condition is True with a given reason, node-problem-detector
@@ -90,6 +92,27 @@ or application split now lives in the rule, with a test that feeds 13 and then 7
 Two more from the same reading: it trims every kernel log line, so a driver line
 ending in `79, ` arrives as `79,`, and its own deployment manifest at the `v1.36.0` tag
 still references image `v0.8.19`.
+
+### A controller acting on watch events can act on a stale node
+
+In Session C my controller announced one drain three times. The node watch events
+that queued up while it was draining carried the node as it was before its own
+`drained-at` annotation, so each one looked like a node that still needed draining;
+the controller found no pods and emitted `GPUNodeDrained` again. It didn't evict
+anything twice, because there was nothing left, but a cordon or an eviction decided
+from a stale copy is exactly the kind of thing that does damage on a bigger fleet.
+The controller now reads the node from the API before acting on anything that looks
+unhealthy, and two regression tests feed it the stale copy.
+
+### A kernel log timestamp isn't a wall clock time
+
+node-problem-detector dates each kernel log record from the kernel's uptime counter,
+and that date becomes the condition's `lastTransitionTime`. On my control plane, six
+days after boot, it came out 4 seconds earlier than the moment node-problem-detector
+actually handled the line; on a GPU node booted 16 minutes earlier, 1 second. Fine for
+knowing roughly when a fault happened, wrong for measuring a sub-second reaction. I
+timed Session C from the node's wall clock at the moment of injection and the
+controller's own millisecond annotations instead.
 
 ## GPU Operator and Node Feature Discovery
 

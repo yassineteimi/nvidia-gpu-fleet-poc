@@ -35,7 +35,7 @@ easy to review, and a version bump is a one-line diff.
 | 3 | node-problem-detector, gpu-remediator | C |
 | 4 | Tenant namespaces and quotas | D |
 
-Waves 3 and 4 don't exist yet; each gets added by the session that builds it.
+Wave 4 doesn't exist yet; Session D adds it.
 
 Three orderings matter:
 

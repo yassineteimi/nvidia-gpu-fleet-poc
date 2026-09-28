@@ -38,6 +38,13 @@ TIMELINE="$OUT/session-c-timeline.txt"
 mkdir -p "$OUT"
 
 stamp() { date -u +%Y-%m-%dT%H:%M:%SZ; }
+# A refusal is evidence too: record it before stopping. In Session C2 the
+# early refusal only reached the terminal.
+refuse() {
+  mkdir -p "$(dirname "$TIMELINE")"
+  echo "refused=$(stamp) node=$NODE reason=\"$1\"" >> "$TIMELINE"
+  die "REFUSED: $1"
+}
 node_json() { kubectl_cp get node "$NODE" -o json; }
 condition() { node_json | jq -r '.status.conditions[]? | select(.type=="GPUUnhealthy") | "\(.status) \(.lastTransitionTime)"'; }
 
@@ -46,18 +53,26 @@ read -r status since <<<"$(condition)"
 [ -n "${status:-}" ] || die "$NODE has no GPUUnhealthy condition. Is node-problem-detector running there?"
 log "$NODE: GPUUnhealthy=$status since $since, GPU node: $is_gpu"
 
+# Nothing to do on a node that is already in service. In Session C2 a second run
+# on a healthy node ran the diagnostic and restarted node-problem-detector anyway.
+unschedulable="$(node_json | jq -r '.spec.unschedulable // false')"
+if [ "$status" = "False" ] && [ "$unschedulable" = "false" ]; then
+  log "$NODE is already in service: GPUUnhealthy=False and schedulable. Nothing to do."
+  exit 0
+fi
+
 # 1. The lookback.
 if [ "$status" = "True" ]; then
   elapsed=$(( $(date -u +%s) - $(date -u -d "$since" +%s 2>/dev/null || date -u -j -f %Y-%m-%dT%H:%M:%SZ "$since" +%s) ))
   if [ "$elapsed" -lt "$LOOKBACK_SECONDS" ]; then
-    die "REFUSED: the XID was logged ${elapsed}s ago. Wait $(( LOOKBACK_SECONDS - elapsed + 5 ))s more, or restarting node-problem-detector will replay it."
+    refuse "the XID was logged ${elapsed}s ago. Wait $(( LOOKBACK_SECONDS - elapsed + 5 ))s more, or restarting node-problem-detector will replay it."
   fi
 fi
 
 # 2. The diagnostic, on GPU nodes only.
 if [ "$is_gpu" = "true" ]; then
   dcgm_pod="$(kubectl_cp -n gpu-operator get pods -l app=nvidia-dcgm --field-selector "spec.nodeName=$NODE" -o jsonpath='{.items[0].metadata.name}')"
-  [ -n "$dcgm_pod" ] || die "REFUSED: no nvidia-dcgm pod on $NODE to run the diagnostic with"
+  [ -n "$dcgm_pod" ] || refuse "no nvidia-dcgm pod on $NODE to run the diagnostic with"
   log "running dcgmi diag -r $DIAG_LEVEL in $dcgm_pod, which can take several minutes"
   started="$(stamp)"
   set +e
@@ -66,7 +81,7 @@ if [ "$is_gpu" = "true" ]; then
   set -e
   echo "diag_level=$DIAG_LEVEL started=$started finished=$(stamp) exit=$rc node=$NODE" | tee -a "$TIMELINE"
   if [ "$rc" -ne 0 ] || grep -qw "Fail" "$OUT/session-c-dcgmi-diag.txt"; then
-    die "REFUSED: dcgmi diag -r $DIAG_LEVEL did not pass. $NODE stays cordoned."
+    refuse "dcgmi diag -r $DIAG_LEVEL did not pass. $NODE stays cordoned."
   fi
   log "dcgmi diag -r $DIAG_LEVEL passed"
 fi
@@ -87,7 +102,7 @@ deadline=$(( $(date +%s) + 90 ))
 while :; do
   read -r status _ <<<"$(condition)"
   [ "$status" = "False" ] && break
-  [ "$(date +%s)" -lt "$deadline" ] || die "REFUSED: GPUUnhealthy is still $status after the restart. Another XID? $NODE stays cordoned."
+  [ "$(date +%s)" -lt "$deadline" ] || refuse "GPUUnhealthy is still $status after the restart. Another XID? $NODE stays cordoned."
   sleep 5
 done
 log "GPUUnhealthy=False on $NODE"

@@ -21,8 +21,8 @@ It's one GPU and a small control plane, so it's a fleet method at small scale, n
 fleet. I've kept a page listing
 [everything that's simulated](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/simulated/).
 The main item: the GPU never actually failed. In Session B I injected an XID into DCGM
-to test alerting, and Session C will write one into the kernel log to test detection
-and remediation.
+to test alerting, and in Session C I wrote them into the node's kernel log to test
+detection and remediation.
 
 ## Build status
 
@@ -30,7 +30,7 @@ and remediation.
 | --- | --- | --- |
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat I explain in the write-up, 2026-09-24 |
-| C | node-problem-detector, remediation controller, fault injection | Planned |
+| C | node-problem-detector, remediation controller, fault injection | **Done.** XID 79 cordoned the L4 node in 0.12 s and drained it in 2.5 s; five of six criteria passed outright, 2026-09-28 |
 | D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |
 
 ## What it covers
@@ -39,7 +39,7 @@ and remediation.
 | --- | --- | --- |
 | **Driver and toolkit lifecycle** | NVIDIA GPU Operator with Node Feature Discovery. Versions pinned in Git; a driver upgrade is a commit that ArgoCD rolls out | A |
 | **GPU health telemetry** | DCGM exporter with a custom counter set (utilisation, SM and tensor activity, framebuffer, temperature, power, ECC, row remapping, clock event reasons, XID) and Prometheus alert rules, each with a unit test | B |
-| **Fault detection and remediation** | node-problem-detector reads `NVRM: Xid` from the kernel log into a node condition. A Python controller cordons, records an event, annotates and drains. A node only returns to service after `dcgmi diag` passes | C, planned |
+| **Fault detection and remediation** | node-problem-detector reads `NVRM: Xid` from the kernel log into a node condition. A Python controller cordons, records an event, annotates and drains. A node only returns to service after `dcgmi diag` passes | C |
 | **Goodput and acceptance** | A PyTorch job with checkpointing, interrupted mid-training, with total, useful and lost time measured. A burn-in record and an acceptance runbook with exit criteria | D, planned |
 
 ## Repository layout
@@ -49,9 +49,9 @@ nvidia-gpu-fleet-poc/
 ├── docs/          # the published GitHub Pages site (MkDocs Material)
 ├── terraform/     # both nodes, cloud-init, private network
 ├── gitops/        # ArgoCD app-of-apps: Applications, Helm values, manifests
-├── controllers/   # gpu-remediator, Python on the Kubernetes client (Session C, not yet built)
+├── controllers/   # gpu-remediator, Python on the Kubernetes client (Session C)
 ├── workloads/     # CUDA acceptance pods; PyTorch training job and goodput analysis in Session D
-└── scripts/       # gpu-up, gpu-down, acceptance, Session B load and capture; fault injection and burn-in come with C and D
+└── scripts/       # gpu-up, gpu-down, acceptance, Session B and C drivers and capture; burn-in comes with D
 ```
 
 ## Quick start

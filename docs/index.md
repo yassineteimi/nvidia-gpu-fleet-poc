@@ -25,7 +25,7 @@ claim progress.
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat, 2026-09-24 |
 | C | node-problem-detector, remediation controller, fault injection | **Done.** Five of six criteria passed outright, one on two of its three paths, 2026-09-28 |
-| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |
+| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Planned, see [Session D](04-goodput-and-burn-in.md) |
 
 ## Worth reading first
 

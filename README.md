@@ -64,7 +64,7 @@ on the [architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/a
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat I explain in the write-up, 2026-09-24 |
 | C | node-problem-detector, remediation controller, fault injection | **Done.** XID 79 cordoned the L4 node in 0.12 s and drained it in 2.5 s; five of six criteria passed outright, 2026-09-28 |
-| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Not started |
+| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Planned |
 
 ## What it covers
 

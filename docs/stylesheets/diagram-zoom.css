@@ -1,0 +1,35 @@
+/* Expand button on each Mermaid diagram, and the full-window viewer. */
+.dz-wrap { position: relative; }
+.dz-wrap div.mermaid { cursor: zoom-in; }
+.dz-open {
+  position: absolute; top: 0.4rem; right: 0.4rem;
+  font: inherit; font-size: 0.65rem; padding: 0.2rem 0.55rem;
+  border: 1px solid var(--md-default-fg-color--lighter); border-radius: 0.2rem;
+  background: var(--md-default-bg-color); color: var(--md-default-fg-color--light);
+  cursor: pointer; opacity: 0.85;
+}
+.dz-open:hover, .dz-open:focus-visible { opacity: 1; color: var(--md-accent-fg-color); }
+
+.dz-dialog {
+  width: 96vw; height: 94vh; max-width: none; max-height: none;
+  padding: 0; border: 1px solid var(--md-default-fg-color--lightest); border-radius: 0.3rem;
+  background: var(--md-default-bg-color); color: var(--md-default-fg-color);
+  display: flex; flex-direction: column;
+}
+.dz-dialog:not([open]) { display: none; }
+.dz-dialog::backdrop { background: rgba(0, 0, 0, 0.6); }
+.dz-bar {
+  display: flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.6rem;
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+.dz-hint { flex: 1; font-size: 0.65rem; color: var(--md-default-fg-color--light); }
+.dz-bar button {
+  font: inherit; font-size: 0.75rem; min-width: 2rem; padding: 0.15rem 0.5rem;
+  border: 1px solid var(--md-default-fg-color--lighter); border-radius: 0.2rem;
+  background: transparent; color: inherit; cursor: pointer;
+}
+.dz-bar button:hover { color: var(--md-accent-fg-color); }
+.dz-stage { flex: 1; overflow: hidden; position: relative; cursor: grab; touch-action: none; }
+.dz-stage:active { cursor: grabbing; }
+.dz-svg { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+.dz-svg svg { display: block; max-width: none !important; }

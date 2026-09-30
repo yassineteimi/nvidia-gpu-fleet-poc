@@ -83,7 +83,7 @@ About 5 GPU hours in total, roughly EUR 4 at EUR 0.79/h.
 | Time slicing config | `gitops/values/gpu-operator-time-slicing.yaml`, not yet listed in the Application | Parsed by the device plugin's own config loader at v0.20.0 (`make test-time-slicing`). A misspelt key and `replicas: 1` both fail, as they should |
 | Training loop and store | `workloads/goodput/trainer/` | 8 unit tests, plus an end to end test against a real Garage server: interrupted at step 130, resumed from the checkpoint at 100, 30 steps redone, only the two newest checkpoints kept. CI runs it against the pinned Garage image |
 | Goodput analysis | `workloads/goodput/trainer/goodput.py` | Unit tests on hand-made step logs with known answers |
-| Trainer image | `workloads/goodput/Dockerfile`, built by CI | The PyTorch base is pinned by digest. The PyTorch backend itself is the one piece that has never run: there's no GPU here, and I couldn't install torch in the authoring environment |
+| Trainer image | `workloads/goodput/Dockerfile`, built by CI, pinned by digest in `job.yaml` | The build runs the PyTorch backend on CPU for two steps and a checkpoint round trip, and publishes nothing if that fails. It has never run on a GPU: bf16 autocast and the step time are for D2a to show |
 | D2 scripts | `scripts/tenancy.sh`, `goodput.sh`, `burn-in.sh` | shellcheck, and every manifest they generate rendered and schema-checked |
 
 The end to end test found a real bug before any GPU time. An evicted attempt's step

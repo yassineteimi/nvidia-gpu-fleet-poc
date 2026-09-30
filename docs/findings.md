@@ -150,6 +150,17 @@ Job creates the secrets once inside the cluster, so they're never in Git.
 
 ## Training jobs
 
+### The PyTorch runtime image isn't a conda image any more
+
+I wrote the trainer's Dockerfile expecting the conda layout I remembered, and the first
+CI build failed on `pip install`. `pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime` is
+Ubuntu 24.04 with torch in the system Python 3.12, which refuses pip installs by
+default (PEP 668), and there's no `python` command, only `python3`. The entry point
+and every pod command in the scripts would have failed on the GPU node too. The image
+now installs with `--break-system-packages`, calls `python3`, and runs the backend on
+CPU during the build, so the next surprise of this kind stops CI rather than a billed
+session.
+
 ### The last seconds of an evicted run disappear unless you flush on the way out
 
 The trainer writes a step log to the bucket every 5 seconds, because the evicted pod,

@@ -38,7 +38,7 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: trainer
-          image: ghcr.io/yassineteimi/goodput-trainer@sha256:PENDING
+          image: ghcr.io/yassineteimi/goodput-trainer@sha256:20709021478483ea9473a89cd753a737fd1e74fad2e71cb2634bb70f599377fa
           envFrom:
             - secretRef:
                 name: checkpoint-s3

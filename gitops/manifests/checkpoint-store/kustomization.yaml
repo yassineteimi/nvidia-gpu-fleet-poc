@@ -1,0 +1,13 @@
+# No kustomize-wide namespace: the bootstrap RBAC deliberately lives in the
+# tenant namespaces, and every resource names its own.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace.yaml
+  - bootstrap.yaml
+  - garage.yaml
+configMapGenerator:
+  - name: garage-config
+    namespace: checkpoint-store
+    files:
+      - garage.toml

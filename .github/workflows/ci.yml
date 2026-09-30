@@ -55,3 +55,45 @@ jobs:
       - uses: actions/setup-go@v5
         with: { go-version: "1.26.5" }
       - run: ./scripts/test-npd-rules.sh
+
+  # The goodput trainer's loop, store and analysis. The end to end test runs
+  # against the same Garage image and garage.toml the cluster runs, with a
+  # throwaway key, so the interrupt-and-resume path is checked against real S3.
+  test-goodput:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: workloads/goodput
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements-dev.txt
+      - name: Start Garage
+        working-directory: .
+        run: |
+          key="GK$(openssl rand -hex 16)"; secret="$(openssl rand -hex 32)"
+          echo "AWS_ACCESS_KEY_ID=$key" >> "$GITHUB_ENV"
+          echo "AWS_SECRET_ACCESS_KEY=$secret" >> "$GITHUB_ENV"
+          docker run -d --name garage -p 3900:3900 \
+            -v "$PWD/gitops/manifests/checkpoint-store/garage.toml:/etc/garage.toml:ro" \
+            -e GARAGE_RPC_SECRET="$(openssl rand -hex 32)" \
+            -e GARAGE_DEFAULT_ACCESS_KEY="$key" -e GARAGE_DEFAULT_SECRET_KEY="$secret" \
+            -e GARAGE_DEFAULT_BUCKET=checkpoints \
+            dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020 \
+            /garage server --single-node --default-bucket
+          for _ in $(seq 30); do curl -s -o /dev/null localhost:3900 && break; sleep 1; done
+          docker logs garage 2>&1 | tail -5
+      - run: python -m pytest -q -rs
+        env: { GARAGE_E2E: "http://127.0.0.1:3900" }
+
+  # The time slicing config, parsed by the NVIDIA device plugin's own loader
+  # at v0.20.0, whose go.mod asks for Go 1.26.0.
+  test-time-slicing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: "1.26.0" }
+      - run: pip install pyyaml
+      - run: ./scripts/test-time-slicing.sh

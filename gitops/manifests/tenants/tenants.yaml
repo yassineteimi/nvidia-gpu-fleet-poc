@@ -1,0 +1,35 @@
+# Two tenant namespaces sharing the one L4 through time slicing, each capped at
+# 2 of the node's 4 time-sliced GPUs. The quota is enforced by the API server
+# at admission: a pod that would take a tenant past 2 is rejected outright,
+# not left Pending.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a
+  labels:
+    gpu-fleet.io/tenant: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-b
+  labels:
+    gpu-fleet.io/tenant: "true"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gpu
+  namespace: tenant-a
+spec:
+  hard:
+    requests.nvidia.com/gpu: "2"
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: gpu
+  namespace: tenant-b
+spec:
+  hard:
+    requests.nvidia.com/gpu: "2"

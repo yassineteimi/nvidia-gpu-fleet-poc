@@ -116,6 +116,50 @@ controller's own millisecond annotations instead.
 
 ## GPU Operator and Node Feature Discovery
 
+### A time slicing change under the same name never reaches the device plugin
+
+The device plugin's config-manager at `v0.20.0` watches one thing: the node label
+`nvidia.com/device-plugin.config`. It doesn't watch the ConfigMap. If I'd changed
+`replicas: 4` to `replicas: 2` under the same config name, the ConfigMap would have
+changed in Git and in the cluster, ArgoCD would have shown everything in sync, and the
+plugin would have kept advertising 4. So the config is named after what it does,
+`ts-4`, and a different split gets a new name. I found this in `cmd/config-manager`
+before the first GPU sitting, not after.
+
+It helps to parse the config with the plugin's own code, too. The loader is lenient
+about the case of field names but not about their spelling: `timeSharing` instead of
+`timeSlicing` fails, and so does `replicas: 1`. `make test-time-slicing` runs the
+`v0.20.0` loader on the exact block in the values file.
+
+## Object storage
+
+### MinIO isn't maintained any more
+
+I'd planned the checkpoint store on MinIO. Its GitHub repository now says it's no
+longer maintained, and the community edition is published as source only, with no
+image to pin. I switched to Garage `v2.4.1`, which runs as a single node and takes
+its first bucket and key from environment variables.
+
+### Garage's Helm chart can't keep its secret under ArgoCD
+
+The chart creates its RPC secret with `lookup`, reusing the existing value if there is
+one. ArgoCD renders charts with `helm template`, where `lookup` always returns nothing,
+so the chart would generate a new secret on every sync. Its single node mode also
+hardcodes the server arguments. I wrote five plain manifests instead, and a bootstrap
+Job creates the secrets once inside the cluster, so they're never in Git.
+
+## Training jobs
+
+### The last seconds of an evicted run disappear unless you flush on the way out
+
+The trainer writes a step log to the bucket every 5 seconds, because the evicted pod,
+and its container log, are deleted by the eviction. The end to end test against a real
+Garage server interrupted a run at step 130 and resumed from the checkpoint at 100. It
+expected 30 redone steps and found 28: the steps since the last flush were gone, and
+the goodput analysis would have counted them as outage instead. The loop now flushes on
+any exit, and SIGTERM is turned into a normal exit so that flush runs. A node that dies
+outright can still lose up to 5 seconds of log, and the analysis says so.
+
 ### Running NFD yourself means copying the operator's NFD settings
 
 Setting `nfd.enabled=false` and running Node Feature Discovery as its own ArgoCD

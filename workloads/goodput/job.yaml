@@ -1,0 +1,64 @@
+# The Session D goodput run, in tenant-a. Applied by scripts/goodput.sh, not
+# by ArgoCD: it's a run with a start and an end, not something to keep synced.
+#
+# How it survives the injected XID 79:
+#   - gpu-remediator drains the node through the Eviction API, which gives the
+#     pod a DisruptionTarget condition. The podFailurePolicy below ignores
+#     failures with that condition, so the eviction doesn't count against
+#     backoffLimit and the Job makes a replacement pod.
+#   - The replacement waits Pending while the only GPU node is cordoned, and is
+#     scheduled when return-to-service uncordons it.
+#   - It resumes from the newest checkpoint in the Garage bucket on the control
+#     plane. Nothing about the run is kept on the GPU node.
+#   - Any other failure ends the run (backoffLimit 0), so a crash can't hide
+#     inside the goodput figure as a quiet retry.
+#
+# RUN_ID is the Job's own UID, read from the label the Job controller puts on
+# its pods: every run gets a fresh prefix in the bucket with no templating.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: goodput
+  namespace: tenant-a
+  labels:
+    app.kubernetes.io/name: goodput
+spec:
+  backoffLimit: 0
+  podFailurePolicy:
+    rules:
+      - action: Ignore
+        onPodConditions:
+          - type: DisruptionTarget
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: goodput
+    spec:
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: trainer
+          image: ghcr.io/yassineteimi/goodput-trainer@sha256:PENDING
+          envFrom:
+            - secretRef:
+                name: checkpoint-s3
+          env:
+            - name: RUN_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.labels['batch.kubernetes.io/controller-uid']
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: TOTAL_STEPS
+              value: "3000"
+            - name: CKPT_EVERY
+              value: "200"
+          resources:
+            requests:
+              cpu: "2"
+              memory: 8Gi
+            limits:
+              memory: 16Gi
+              nvidia.com/gpu: 1

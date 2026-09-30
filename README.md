@@ -64,7 +64,7 @@ on the [architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/a
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat I explain in the write-up, 2026-09-24 |
 | C | node-problem-detector, remediation controller, fault injection | **Done.** XID 79 cordoned the L4 node in 0.12 s and drained it in 2.5 s; five of six criteria passed outright, 2026-09-28 |
-| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | Planned |
+| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | In progress: built and tested without a GPU; the two GPU sittings are next |
 
 ## What it covers
 
@@ -84,7 +84,7 @@ nvidia-gpu-fleet-poc/
 ├── gitops/        # ArgoCD app-of-apps: Applications, Helm values, manifests
 ├── controllers/   # gpu-remediator, Python on the Kubernetes client (Session C)
 ├── workloads/     # CUDA acceptance pods; PyTorch training job and goodput analysis in Session D
-└── scripts/       # gpu-up, gpu-down, acceptance, Session B and C drivers and capture; burn-in comes with D
+└── scripts/       # gpu-up, gpu-down, acceptance, and each session's drivers and capture
 ```
 
 ## Quick start

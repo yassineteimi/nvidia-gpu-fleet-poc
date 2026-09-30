@@ -109,6 +109,12 @@ flowchart TB
     lpp["local-path-storage<br/>local-path-provisioner"]
   end
 
+  subgraph ten["tenancy and checkpoints"]
+    direction LR
+    garage["checkpoint-store<br/>Garage v2.4.1, S3 API :3900"] --- gpvc[("10Gi PVC<br/>local-path")]
+    tns["tenant-a, tenant-b<br/>quota: 2 GPUs each,<br/>checkpoint-s3 Secret"]
+  end
+
   subgraph every["on every node, this one included"]
     direction LR
     kubelet["host: kubelet 1.36.4,<br/>containerd 2.3.5"]
@@ -126,6 +132,7 @@ flowchart TB
   argo -->|"applies what's in Git"| ks
   mon -->|"watches pods, services, CRDs"| ks
   fleet -->|"labels, DaemonSets, cordons,<br/>evictions, volumes"| ks
+  ten -->|"quota admission, Secrets, volume"| ks
   every -->|"node status, conditions"| ks
 ```
 
@@ -229,20 +236,24 @@ flowchart LR
   w1["wave 1<br/>gpu-operator"]
   w2["wave 2<br/>gpu-observability:<br/>alert rules, dashboard"]
   w3["wave 3<br/>node-problem-detector<br/>gpu-remediator"]
+  w4["wave 4<br/>tenants:<br/>namespaces, quotas"]
+  w5["wave 5<br/>checkpoint-store:<br/>Garage, bootstrap Job"]
 
-  root --> w_1 --> w0 --> w1 --> w2 --> w3
+  root --> w_1 --> w0 --> w1 --> w2 --> w3 --> w4 --> w5
 ```
 
 Each Application has two sources: the upstream chart, untouched and pinned, and this
 repository as a `ref` for the values file. A wave only starts once the previous one
 is healthy, which works only because my ArgoCD values restore the health check for
-`Application` resources that ArgoCD dropped in 1.8 ([Findings](findings.md)). Three
+`Application` resources that ArgoCD dropped in 1.8 ([Findings](findings.md)). Four
 orderings matter:
 
 - storage before anything that asks for a volume;
 - kube-prometheus-stack before the GPU Operator, whose ServiceMonitor for the DCGM
   exporter needs the Prometheus Operator's CRDs;
 - Node Feature Discovery before the GPU Operator, which selects nodes on NFD's labels.
+- the tenant namespaces before the checkpoint store, whose bootstrap Job writes each
+  tenant's S3 credentials into them.
 
 I run NFD as its own Application, with `nfd.enabled=false` in the GPU Operator values,
 so the labels that drive GPU scheduling are pinned in Git rather than a side effect

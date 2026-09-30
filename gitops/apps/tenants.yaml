@@ -1,0 +1,38 @@
+# Tenant namespaces and their GPU quotas, sync wave 4.
+#
+# Two namespaces, each capped at 2 time-sliced GPUs. Session D.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: tenants
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "4"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+    targetRevision: main
+    path: gitops/manifests/tenants
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: tenants
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    # ArgoCD does not retry a failed automatic sync of the same commit on its
+    # own. Without this, losing a race with a CRD would leave it failed.
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

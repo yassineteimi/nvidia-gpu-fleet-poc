@@ -1,0 +1,130 @@
+# Generates Garage's secrets inside the cluster the first time, so none of them
+# is ever in Git, then hands the S3 credentials to each tenant namespace.
+# Idempotent: an existing Secret is kept, and the tenant copies are re-applied.
+# Runs before Garage (sync wave -1), because Garage reads the Secret at start.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: garage-bootstrap
+  namespace: checkpoint-store
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: garage-bootstrap
+  namespace: checkpoint-store
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: garage-bootstrap
+  namespace: checkpoint-store
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: garage-bootstrap}
+subjects: [{kind: ServiceAccount, name: garage-bootstrap, namespace: checkpoint-store}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkpoint-s3-writer
+  namespace: tenant-a
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["checkpoint-s3"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkpoint-s3-writer
+  namespace: tenant-a
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: checkpoint-s3-writer}
+subjects: [{kind: ServiceAccount, name: garage-bootstrap, namespace: checkpoint-store}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: checkpoint-s3-writer
+  namespace: tenant-b
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["checkpoint-s3"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: checkpoint-s3-writer
+  namespace: tenant-b
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: checkpoint-s3-writer}
+subjects: [{kind: ServiceAccount, name: garage-bootstrap, namespace: checkpoint-store}]
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: garage-bootstrap
+  namespace: checkpoint-store
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      serviceAccountName: garage-bootstrap
+      restartPolicy: Never
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      containers:
+        - name: bootstrap
+          image: alpine/k8s:1.36.5@sha256:094adf64cdc4827377cdbe7ea5747472ce115f9fbc64a4e35970ec66777f9a00
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              hex() { head -c "$1" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
+              if kubectl -n checkpoint-store get secret garage-credentials >/dev/null 2>&1; then
+                echo "garage-credentials exists, keeping it"
+              else
+                kubectl -n checkpoint-store create secret generic garage-credentials \
+                  --from-literal=rpc-secret="$(hex 32)" \
+                  --from-literal=access-key-id="GK$(hex 16)" \
+                  --from-literal=secret-access-key="$(hex 32)"
+                echo "garage-credentials created"
+              fi
+              get() { kubectl -n checkpoint-store get secret garage-credentials -o jsonpath="{.data.$1}" | base64 -d; }
+              ak="$(get access-key-id)"; sk="$(get secret-access-key)"
+              for ns in tenant-a tenant-b; do
+                kubectl -n "$ns" create secret generic checkpoint-s3 \
+                  --from-literal=AWS_ACCESS_KEY_ID="$ak" \
+                  --from-literal=AWS_SECRET_ACCESS_KEY="$sk" \
+                  --from-literal=AWS_ENDPOINT_URL=http://garage.checkpoint-store.svc:3900 \
+                  --from-literal=AWS_DEFAULT_REGION=garage \
+                  --from-literal=CHECKPOINT_BUCKET=checkpoints \
+                  --dry-run=client -o yaml | kubectl apply -f -
+                echo "checkpoint-s3 applied in $ns"
+              done

@@ -19,6 +19,9 @@
 #
 # Any gate that fails stops here, with the node still cordoned.
 #
+# SESSION=d files the evidence as session-d-* (the Session D goodput run
+# reuses this script); the default is Session C's names.
+#
 # On a node that isn't a GPU node (the free test on the control plane), there
 # is no GPU to diagnose and the controller never cordoned it: steps 1, 3 and 4
 # run, to clear the condition, and nothing else.
@@ -34,7 +37,7 @@ DIAG_LEVEL="${DIAG_LEVEL:-2}"
 LOOKBACK_SECONDS=300
 GPU_LABEL="feature.node.kubernetes.io/pci-10de.present"
 OUT="$REPO_ROOT/docs/artifacts"
-TIMELINE="$OUT/session-c-timeline.txt"
+TIMELINE="$OUT/session-${SESSION:-c}-timeline.txt"
 mkdir -p "$OUT"
 
 stamp() { date -u +%Y-%m-%dT%H:%M:%SZ; }
@@ -76,11 +79,11 @@ if [ "$is_gpu" = "true" ]; then
   log "running dcgmi diag -r $DIAG_LEVEL in $dcgm_pod, which can take several minutes"
   started="$(stamp)"
   set +e
-  kubectl_cp -n gpu-operator exec "$dcgm_pod" -- dcgmi diag -r "$DIAG_LEVEL" 2>&1 | tee "$OUT/session-c-dcgmi-diag.txt"
+  kubectl_cp -n gpu-operator exec "$dcgm_pod" -- dcgmi diag -r "$DIAG_LEVEL" 2>&1 | tee "$OUT/session-${SESSION:-c}-dcgmi-diag.txt"
   rc="${PIPESTATUS[0]}"
   set -e
   echo "diag_level=$DIAG_LEVEL started=$started finished=$(stamp) exit=$rc node=$NODE" | tee -a "$TIMELINE"
-  if [ "$rc" -ne 0 ] || grep -qw "Fail" "$OUT/session-c-dcgmi-diag.txt"; then
+  if [ "$rc" -ne 0 ] || grep -qw "Fail" "$OUT/session-${SESSION:-c}-dcgmi-diag.txt"; then
     refuse "dcgmi diag -r $DIAG_LEVEL did not pass. $NODE stays cordoned."
   fi
   log "dcgmi diag -r $DIAG_LEVEL passed"

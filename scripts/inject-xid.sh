@@ -10,6 +10,9 @@
 # honest about where it came from. Nothing happens to the GPU: the driver, the
 # device plugin and DCGM learn about XIDs through NVML and never see this line.
 #
+# SESSION=d files the evidence as session-d-* (the Session D goodput run
+# reuses this script); the default is Session C's names.
+#
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -21,7 +24,7 @@ resolve_ssh_keypair
 NODE="${1:?usage: scripts/inject-xid.sh <node> <xid>}"
 XID="${2:?usage: scripts/inject-xid.sh <node> <xid>}"
 [[ "$XID" =~ ^[0-9]+$ ]] || die "XID must be a number, got $XID"
-TIMELINE="$REPO_ROOT/docs/artifacts/session-c-timeline.txt"
+TIMELINE="$REPO_ROOT/docs/artifacts/session-${SESSION:-c}-timeline.txt"
 
 # The SSH address of a node, from Terraform, which is the only thing that knows it.
 if [ "$NODE" = "$(tf_output gpu_node_name)" ]; then

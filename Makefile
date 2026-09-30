@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: help cluster argocd argocd-ui grafana-ui check-dcgm-image gpu-images up acceptance load load-stop inject-xid-dcgm capture-b capture-b-history test-rules workload workload-stop inject-xid return-to-service capture-c test-controller test-npd-rules down cost burn-in docs docs-serve lint shellcheck fmt test
+.PHONY: help cluster argocd argocd-ui grafana-ui check-dcgm-image gpu-images up acceptance load load-stop inject-xid-dcgm capture-b capture-b-history test-rules workload workload-stop inject-xid return-to-service capture-c test-controller test-npd-rules down cost test-goodput test-time-slicing tenancy-wait tenancy tenancy-capture tenancy-stop prepull goodput goodput-status goodput-capture burn-in-diag burn-in burn-in-status burn-in-capture docs docs-serve lint shellcheck fmt test
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -70,8 +70,47 @@ down:          ## Drain the GPU node, remove it from the cluster, destroy it
 cost:          ## Report how long the GPU node has been up and what it has cost
 	./scripts/cost-report.sh
 
-burn-in:       ## Run the burn-in loop and record the stability log
-	./scripts/burn-in.sh
+test-goodput:  ## Unit tests for the goodput trainer loop, store and analysis
+	cd workloads/goodput && python3 -m pytest -q
+
+test-time-slicing: ## Parse the time slicing config with the device plugin's own loader (needs Go)
+	./scripts/test-time-slicing.sh
+
+tenancy-wait:  ## After the time slicing commit: wait for the GPU node to advertise 4 GPUs
+	./scripts/tenancy.sh wait-slicing
+
+tenancy:       ## GPU pods in both tenants, then a third in tenant-a that the quota refuses
+	./scripts/tenancy.sh start
+
+tenancy-capture: ## Capture the time slicing and tenancy evidence
+	./scripts/tenancy.sh capture
+
+tenancy-stop:  ## Remove the tenant GPU pods
+	./scripts/tenancy.sh stop
+
+prepull:       ## Pull the trainer image onto the GPU node, timed
+	./scripts/goodput.sh prepull
+
+goodput:       ## Start the goodput training Job in tenant-a
+	./scripts/goodput.sh start
+
+goodput-status: ## Where the goodput Job and its pods are
+	./scripts/goodput.sh status
+
+goodput-capture: ## After the Job completes: step logs, Job timestamps, goodput
+	./scripts/goodput.sh capture
+
+burn-in-diag:  ## dcgmi diag -r 3 on the GPU node, timed (LABEL=before|after)
+	./scripts/burn-in.sh diag "$(LABEL)"
+
+burn-in:       ## Start the 3 hour burn-in load; it stops by itself
+	./scripts/burn-in.sh start
+
+burn-in-status: ## Where the burn-in Job is
+	./scripts/burn-in.sh status
+
+burn-in-capture: ## After the burn-in: the stability record from Prometheus
+	./scripts/burn-in.sh capture
 
 docs-serve:    ## Serve the documentation site locally
 	.venv/bin/mkdocs serve

@@ -1,0 +1,30 @@
+# Time slicing for the L4, as a second values file for the GPU Operator.
+#
+# Inert until gitops/apps/gpu-operator.yaml lists it under valueFiles, so
+# switching time slicing on or off is a one-line commit that ArgoCD rolls out.
+#
+# Each config version gets its own name (ts-4), and `default` points at it.
+# The device plugin's config-manager (cmd/config-manager at v0.20.0) only
+# reacts to a change of the node label nvidia.com/device-plugin.config, never
+# to the ConfigMap's contents. Editing replicas under the same name would
+# change the ConfigMap and leave the running plugin on the old value. A new
+# name changes the ClusterPolicy instead, and the operator rolls the plugin.
+#
+# The schema, sharing.timeSlicing.resources[{name, replicas}], is the device
+# plugin's at v0.20.0, and this block is parsed by that version's own config
+# loader in scripts/test-time-slicing.sh.
+devicePlugin:
+  config:
+    create: true
+    name: device-plugin-config
+    default: ts-4
+    data:
+      ts-4: |-
+        version: v1
+        flags:
+          migStrategy: none
+        sharing:
+          timeSlicing:
+            resources:
+              - name: nvidia.com/gpu
+                replicas: 4

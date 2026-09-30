@@ -1,0 +1,72 @@
+# One Garage node on the control plane, so checkpoints outlive the GPU node.
+# `--single-node --default-bucket` creates the layout, the access key and the
+# `checkpoints` bucket at start, from the environment below, and does nothing
+# on a restart where they exist: both checked against the v2.4.1 binary.
+apiVersion: v1
+kind: Service
+metadata:
+  name: garage
+  namespace: checkpoint-store
+spec:
+  selector:
+    app: garage
+  ports:
+    - name: s3
+      port: 3900
+      targetPort: 3900
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: garage
+  namespace: checkpoint-store
+spec:
+  serviceName: garage
+  replicas: 1
+  selector:
+    matchLabels:
+      app: garage
+  template:
+    metadata:
+      labels:
+        app: garage
+    spec:
+      nodeSelector:
+        node-role.kubernetes.io/control-plane: ""
+      containers:
+        - name: garage
+          image: dxflrs/garage:v2.4.1@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020
+          command: ["/garage", "server", "--single-node", "--default-bucket"]
+          env:
+            - name: GARAGE_RPC_SECRET
+              valueFrom: {secretKeyRef: {name: garage-credentials, key: rpc-secret}}
+            - name: GARAGE_DEFAULT_ACCESS_KEY
+              valueFrom: {secretKeyRef: {name: garage-credentials, key: access-key-id}}
+            - name: GARAGE_DEFAULT_SECRET_KEY
+              valueFrom: {secretKeyRef: {name: garage-credentials, key: secret-access-key}}
+            - name: GARAGE_DEFAULT_BUCKET
+              value: checkpoints
+          ports:
+            - {name: s3, containerPort: 3900}
+          readinessProbe:
+            tcpSocket: {port: 3900}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {memory: 512Mi}
+          volumeMounts:
+            - {name: config, mountPath: /etc/garage.toml, subPath: garage.toml}
+            - {name: data, mountPath: /var/lib/garage}
+      volumes:
+        - name: config
+          configMap:
+            name: garage-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        storageClassName: local-path
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

@@ -1,0 +1,40 @@
+# Garage, an S3-compatible store for training checkpoints, sync wave 5.
+#
+# After the tenants (wave 4), because its bootstrap Job writes the S3
+# credentials into their namespaces. On the control plane, so checkpoints
+# survive the GPU node. Session D.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: checkpoint-store
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
+    targetRevision: main
+    path: gitops/manifests/checkpoint-store
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: checkpoint-store
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    # ArgoCD does not retry a failed automatic sync of the same commit on its
+    # own. Without this, losing a race with a CRD would leave it failed.
+    retry:
+      limit: 5
+      backoff:
+        duration: 20s
+        factor: 2
+        maxDuration: 5m

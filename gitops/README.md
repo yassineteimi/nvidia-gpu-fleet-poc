@@ -33,17 +33,18 @@ easy to review, and a version bump is a one-line diff.
 | 1 | gpu-operator | A |
 | 2 | gpu-observability: GPU alert rules and the Grafana dashboard | B |
 | 3 | node-problem-detector, gpu-remediator | C |
-| 4 | Tenant namespaces and quotas | D |
+| 4 | tenants: namespaces `tenant-a` and `tenant-b`, 2 GPUs of quota each | D |
+| 5 | checkpoint-store: Garage, and a Job that hands each tenant its S3 credentials | D |
 
-Wave 4 doesn't exist yet; Session D adds it.
-
-Three orderings matter:
+Four orderings matter:
 
 - storage before anything that asks for a volume;
 - Node Feature Discovery before the GPU Operator, which selects nodes on NFD's labels;
 - kube-prometheus-stack before the GPU Operator. That's why it moved from wave 1 to
   wave 0 in Session B: the operator creates a ServiceMonitor for the DCGM exporter by
   default, and that can't exist until the Prometheus Operator's CRDs do.
+- tenants before checkpoint-store: its bootstrap Job writes each tenant's S3
+  credentials into the tenant namespaces, so they have to exist first.
 
 > **The waves only wait for readiness because of one setting.** ArgoCD stopped
 > assessing the health of `Application` resources in version 1.8. Without that

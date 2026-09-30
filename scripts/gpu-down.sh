@@ -13,7 +13,7 @@
 
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-require_tools terraform kubectl ssh-keygen
+require_tools terraform kubectl ssh-keygen curl jq
 load_env
 
 GPU_NODE_NAME="$(tf_output gpu_node_name)"
@@ -54,7 +54,46 @@ cat > "$GPU_TFVARS" <<EOF
 gpu_node_enabled = false
 EOF
 
+########################################
+# Check Scaleway itself for anything left behind
+#
+# Terraform only knows what it created. When an L4 is created but can't be
+# booted (no capacity), Scaleway can still create its root volume without
+# attaching it: the server's state has no volume ID, the provider fails the
+# destroy with "volume ID not found", and a 150 GB volume keeps billing where
+# Terraform can't see it. That happened in Session D. So after every teardown,
+# successful or not, ask the API what's still in the GPU node's zone: a server
+# with its name, and any block volume nothing is attached to. This only
+# reports. Deleting by a guess is worse than a warning.
+########################################
+
+check_leftovers() {
+  local zone api servers volumes
+  zone="$(tf_output gpu_zone)"
+  [ -n "$zone" ] || zone="$(tf_output zone)"
+  [ -n "$zone" ] || { warn "no zone in the Terraform outputs, skipping the leftover check"; return 0; }
+  api="https://api.scaleway.com"
+
+  servers="$(curl -fsS -H "X-Auth-Token: $SCW_SECRET_KEY" "$api/instance/v1/zones/$zone/servers?name=$GPU_NODE_NAME" 2>/dev/null \
+    | jq -r --arg n "$GPU_NODE_NAME" '.servers[] | select(.name == $n) | "\(.id) state=\(.state)"' || true)"
+  volumes="$(curl -fsS -H "X-Auth-Token: $SCW_SECRET_KEY" "$api/block/v1alpha1/zones/$zone/volumes" 2>/dev/null \
+    | jq -r '.volumes[] | select((.references // []) | length == 0) | "\(.id) \(.name) \(.size / 1e9)GB created=\(.created_at)"' || true)"
+
+  if [ -z "$servers" ] && [ -z "$volumes" ]; then
+    log "Scaleway shows no GPU server and no unattached volume left in $zone"
+    return 0
+  fi
+  warn "still at Scaleway in $zone, and billing:"
+  [ -n "$servers" ] && printf '    server %s\n' "$servers" >&2
+  [ -n "$volumes" ] && printf '    unattached volume %s\n' "$volumes" >&2
+  warn "check each one is this node's, then delete it through the API, server first:"
+  warn "  curl -X DELETE -H \"X-Auth-Token: \$SCW_SECRET_KEY\" $api/instance/v1/zones/$zone/servers/<id>"
+  warn "  curl -X DELETE -H \"X-Auth-Token: \$SCW_SECRET_KEY\" $api/block/v1alpha1/zones/$zone/volumes/<id>"
+  warn "then: terraform -chdir=terraform state rm 'scaleway_instance_server.gpu_node[0]' && make down"
+}
+
 log "terraform apply, destroying the GPU node"
+trap check_leftovers EXIT
 apply_gpu_only
 
 [ -n "$GPU_PUBLIC_IP" ] && forget_host "$GPU_PUBLIC_IP"

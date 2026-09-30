@@ -312,6 +312,24 @@ another zone of fr-par and still join over the private network. A `gpu_zone` var
 now moves only the GPU node's four zonal resources: its IP, the server, its private
 NIC and its security group.
 
+### A GPU that can't boot still leaves a volume billing
+
+fr-par-1 listed the L4 as `scarce`, so I tried it. Terraform created the server, asked
+Scaleway to power it on, and got it back stopped: `expected state running but found
+stopped`, with an empty `state_detail`. Minutes later the zone read `shortage`, so it
+was capacity, not configuration. The expensive part came after. Scaleway had created
+the 150 GB root volume from the image but never attached it, so the server's state had
+no volume ID, and `make down` failed with `volume ID not found`. The volume was still
+there and billing, and Terraform had no idea it existed. I found it by listing the
+zone's block volumes, deleted the server and the volume through the API, removed the
+server from the Terraform state and ran `make down` again for the IP.
+
+`make down` now asks the API what's left in the GPU node's zone every time it runs,
+whether the apply worked or not: a server with the node's name, and any block volume
+with nothing attached. It prints them with the delete commands. It doesn't delete
+them: a volume picked by name alone is a guess, and a wrong guess deletes something
+that isn't mine.
+
 Scaleway's availability API (`/instance/v1/zones/<zone>/products/servers/availability`)
 left `L4-1-24G` out of fr-par-2's list entirely during the shortage, rather than
 reporting it as `shortage`. A missing entry there means "none right now", not

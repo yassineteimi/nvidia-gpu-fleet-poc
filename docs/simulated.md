@@ -1,7 +1,7 @@
 # What is simulated
 
 If something in this project didn't come from real hardware doing a real thing, it's
-on this page. Rows for Session D describe the plan, because it hasn't run yet.
+on this page. The burn-in row describes the plan, because D2b hasn't run yet.
 
 | Item | Real | Simulated | Why |
 |---|---|---|---|
@@ -9,8 +9,8 @@ on this page. Rows for Session D describe the plan, because it hasn't run yet.
 | GPU hardware fault (Session C, done) | node-problem-detector, the node condition, the cordon, the drain through the Eviction API, the Events, and the gate back into service with a real `dcgmi diag` | The XID. `scripts/inject-xid.sh` wrote `NVRM: Xid` lines in the driver's exact format into the node's kernel log, with SIMULATED in the message. The driver, NVML and the device plugin never saw them, so the GPU stayed allocatable | I can't make a rented L4 fail on demand, and damaging rented hardware on purpose isn't an option |
 | Fleet scale | Every operation is the one a fleet operator runs, on one node | One node stands in for a fleet: no cross-node scheduling pressure, no correlated failures | Cost. One L4 at EUR 0.79/h fits a 5 hour weekly budget; a rack doesn't |
 | Burn-in duration (Session D, planned) | The load, the telemetry, the thresholds and the stability record | The duration: hours, not days | A real acceptance campaign runs for days across racks. See [Session D](04-goodput-and-burn-in.md) |
-| Multi-tenancy (Session D, planned) | Two namespaces, real ResourceQuota enforcement, real time-sliced GPU sharing | The tenants aren't real teams and the workloads are synthetic | It shows the mechanism, not the organisation |
-| Training job and its interruption (Session D, planned) | PyTorch on the L4, checkpoints in Garage, the eviction by gpu-remediator, the wait for return to service and the resume | The data is random tensors, and the model is an 8 layer MLP sized to keep the GPU busy. The interruption is Session C's simulated XID 79: the process is evicted with SIGTERM while its GPU still works. It deliberately writes no checkpoint on SIGTERM, since a process whose GPU fell off the bus couldn't | The goodput figure is about the lost time around a fault, not about the model. Downloading a dataset onto a node billed by the hour buys nothing here |
+| Multi-tenancy (Session D, done) | Two namespaces, real ResourceQuota enforcement, real time-sliced GPU sharing: three processes on one L4 and a pod refused by the API server | The tenants aren't real teams and the workloads are synthetic | It shows the mechanism, not the organisation |
+| Training job and its interruption (Session D, done) | PyTorch on the L4, checkpoints in Garage, the eviction by gpu-remediator, the wait for return to service and the resume | The data is random tensors, and the model is an 8 layer MLP sized to keep the GPU busy. The interruption is Session C's simulated XID 79: the process is evicted with SIGTERM while its GPU still works. It deliberately writes no checkpoint on SIGTERM, since a process whose GPU fell off the bus couldn't | The goodput figure is about the lost time around a fault, not about the model. Downloading a dataset onto a node billed by the hour buys nothing here |
 | Hardware handover | The acceptance runbook and its checks | There's no physical handover. The "handover" is a Terraform apply | No bare metal at this budget |
 
 ## What isn't simulated
@@ -34,5 +34,6 @@ These are the parts that would be easiest to fake:
   real. Only the XID lines were written by hand.
 - **The power-throttling alert** (Session B) fired on real power capping under that
   load. I didn't arrange it.
-- **The goodput figure** (Session D, planned) will come from real step timestamps and
-  real Kubernetes event timestamps, both published in the repository.
+- **The goodput figure** (Session D) comes from real step timestamps written by the
+  trainer on the L4 and the Job's own start and completion times, all published in
+  `docs/artifacts/`. Only the fault that interrupted it was injected.

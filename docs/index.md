@@ -15,7 +15,7 @@ output on these pages was captured during the sessions and links back to files i
 - A measured goodput figure for a training job that gets interrupted, plus an
   acceptance runbook with exit criteria.
 
-Sessions A, B and C are done. D isn't, and the table below is the only place I
+Sessions A, B and C are done, and D is half done. The table below is the only place I
 claim progress.
 
 ## Build status
@@ -25,10 +25,13 @@ claim progress.
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat, 2026-09-24 |
 | C | node-problem-detector, remediation controller, fault injection | **Done.** Five of six criteria passed outright, one on two of its three paths, 2026-09-28 |
-| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | In progress: built and tested without a GPU, see [Session D](04-goodput-and-burn-in.md) |
+| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | **D2a done:** 4 time-sliced GPUs from one commit, quotas enforced, 66.4% goodput through an injected XID 79, 2026-09-30. Burn-in next, see [Session D](04-goodput-and-burn-in.md) |
 
 ## Worth reading first
 
+- [Session D](04-goodput-and-burn-in.md): a training job loses its GPU mid-run and
+  resumes from a checkpoint on the control plane, and I account for all 1383 seconds
+  of it. 26% went to the outage, and most of that to one 5 minute rule.
 - [Session C](03-fault-remediation.md): an injected XID 79 cordons the L4 node in 0.12
   seconds and drains it in 2.5, and the design changed twice because of what
   node-problem-detector's source says.

@@ -14,14 +14,20 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 COPY trainer/ trainer/
 
-# Smoke test at build time, on CPU: every module imports, and the PyTorch
-# backend takes a step and round-trips a checkpoint. No image if it doesn't.
+# Nothing here needs root. The uid has no /etc/passwd entry, and building
+# torch's SGD optimizer imports torch._dynamo, which names its cache directory
+# after getpass.getuser(); that reads USER first. Without it the first Job on
+# the L4 died at start (docs/04-goodput-and-burn-in.md). HOME is somewhere
+# writable for torch's caches.
+ENV HOME=/tmp USER=trainer PYTHONUNBUFFERED=1
+USER 65532:65532
+
+# Smoke test at build time, on CPU and as the user the Job runs as: every module
+# imports, and the PyTorch backend builds its optimizer, takes a step and
+# round-trips a checkpoint. No image if it doesn't.
 RUN python3 -c "import boto3; from trainer import dump, goodput, loop, s3, store; \
 from trainer.torch_backend import TorchBackend; \
 b = TorchBackend(width=64, depth=2, batch=32, device='cpu'); b.step(); b.load(b.save()); b.step(); \
 print('trainer smoke test passed')"
 
-# Nothing here needs root. HOME is somewhere writable for torch's caches.
-ENV HOME=/tmp PYTHONUNBUFFERED=1
-USER 65532:65532
 ENTRYPOINT ["python3", "-m", "trainer"]

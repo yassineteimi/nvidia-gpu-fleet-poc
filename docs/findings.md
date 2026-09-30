@@ -150,6 +150,18 @@ Job creates the secrets once inside the cluster, so they're never in Git.
 
 ## Training jobs
 
+### A non-root PyTorch image dies building its optimizer
+
+The first training Job on the L4 died in under a second: `getpwuid(): uid not found:
+65532`. Creating `torch.optim.SGD` at torch 2.11 imports `torch._dynamo`, which names
+an Inductor cache directory after `getpass.getuser()`, and that looks the uid up in
+`/etc/passwd` unless `USER` or `LOGNAME` is set. My image runs as 65532 with no passwd
+entry, which is normal for a distroless-style non-root image, and nothing is ever
+compiled, yet constructing the optimizer is enough. The tenancy pods, running plain
+tensor maths as the same uid, never hit it. The image build's smoke test missed it
+too, because it ran before the `USER` line, as root. `USER` is now set in the Job and
+the image, and the smoke test runs as the image's user.
+
 ### The PyTorch runtime image isn't a conda image any more
 
 I wrote the trainer's Dockerfile expecting the conda layout I remembered, and the first
@@ -310,7 +322,8 @@ have rebuilt the control plane and lost etcd, ArgoCD, the Prometheus history and
 checkpoint store. Private Networks are regional, though, so the GPU node can sit in
 another zone of fr-par and still join over the private network. A `gpu_zone` variable
 now moves only the GPU node's four zonal resources: its IP, the server, its private
-NIC and its security group.
+NIC and its security group. The node joined across zones and ran all of D2a from fr-par-1,
+checkpoints to fr-par-2 included, at 2.0 to 2.5 s per write of roughly 270 MB (my estimate from the model size).
 
 ### A GPU that can't boot still leaves a volume billing
 

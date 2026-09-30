@@ -1,7 +1,7 @@
 <h1 align="center">NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes</h1>
 
 <p align="center">
-  <b>Driver lifecycle · GPU health telemetry · Fault remediation</b> on a rented NVIDIA L4, run from Git<br/>
+  <b>Driver lifecycle · GPU health telemetry · Fault remediation · Goodput</b> on a rented NVIDIA L4, run from Git<br/>
   kubeadm · ArgoCD app-of-apps · GPU Operator · DCGM · Prometheus
 </p>
 
@@ -31,13 +31,13 @@ flowchart LR
   laptop["Operator laptop<br/>make, terraform, kubectl"]
   scw["Scaleway API"]
   gh["GitHub<br/>this repository"]
-  ci["GitHub Actions<br/>tests, controller image"]
+  ci["GitHub Actions<br/>tests, controller and<br/>trainer images"]
   reg["Container registries<br/>nvcr.io, registry.k8s.io,<br/>quay.io, ghcr.io, docker.io"]
 
-  subgraph cluster["kubeadm cluster in Scaleway fr-par-2"]
+  subgraph cluster["kubeadm cluster in Scaleway region fr-par"]
     direction TB
-    cp["gpu-fleet-cp-01<br/>control plane, always on<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator"]
-    gpu["gpu-fleet-gpu-01<br/>NVIDIA L4, per session<br/>driver, device plugin, DCGM,<br/>node-problem-detector"]
+    cp["gpu-fleet-cp-01<br/>fr-par-2, control plane, always on<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator,<br/>Garage checkpoint store"]
+    gpu["gpu-fleet-gpu-01<br/>any fr-par zone, NVIDIA L4, per session<br/>driver, device plugin, DCGM,<br/>node-problem-detector"]
     cp <-->|"API, pod network"| gpu
   end
 
@@ -64,7 +64,7 @@ on the [architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/a
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat I explain in the write-up, 2026-09-24 |
 | C | node-problem-detector, remediation controller, fault injection | **Done.** XID 79 cordoned the L4 node in 0.12 s and drained it in 2.5 s; five of six criteria passed outright, 2026-09-28 |
-| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | In progress: built and tested without a GPU; the two GPU sittings are next |
+| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | **D2a done.** One commit took the L4 to 4 time-sliced GPUs, quotas refused the extra pod, and an interrupted training run measured 66.4% goodput, 2026-09-30. Burn-in next |
 
 ## What it covers
 
@@ -73,7 +73,8 @@ on the [architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/a
 | **Driver and toolkit lifecycle** | NVIDIA GPU Operator with Node Feature Discovery. Versions pinned in Git; a driver upgrade is a commit that ArgoCD rolls out | A |
 | **GPU health telemetry** | DCGM exporter with a custom counter set (utilisation, SM and tensor activity, framebuffer, temperature, power, ECC, row remapping, clock event reasons, XID) and Prometheus alert rules, each with a unit test | B |
 | **Fault detection and remediation** | node-problem-detector reads `NVRM: Xid` from the kernel log into a node condition. A Python controller cordons, records an event, annotates and drains. A node only returns to service after `dcgmi diag` passes | C |
-| **Goodput and acceptance** | A PyTorch job with checkpointing, interrupted mid-training, with total, useful and lost time measured. A burn-in record and an acceptance runbook with exit criteria | D, planned |
+| **Tenancy and goodput** | Time slicing from a commit, two tenant namespaces with GPU quotas, and a PyTorch job that checkpoints to Garage, loses its GPU to an injected XID 79 and resumes, with every second of the run accounted for | D |
+| **Acceptance** | A 3 hour burn-in record and an acceptance runbook with exit criteria | D, next |
 
 ## Repository layout
 

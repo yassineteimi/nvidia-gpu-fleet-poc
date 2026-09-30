@@ -12,13 +12,13 @@ flowchart LR
   laptop["Operator laptop<br/>make, terraform, kubectl"]
   scw["Scaleway API"]
   gh["GitHub<br/>this repository"]
-  ci["GitHub Actions<br/>tests, controller image"]
+  ci["GitHub Actions<br/>tests, controller and<br/>trainer images"]
   reg["Container registries<br/>nvcr.io, registry.k8s.io,<br/>quay.io, ghcr.io, docker.io"]
 
-  subgraph cluster["kubeadm cluster in Scaleway fr-par-2"]
+  subgraph cluster["kubeadm cluster in Scaleway region fr-par"]
     direction TB
-    cp["gpu-fleet-cp-01<br/>control plane, always on<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator"]
-    gpu["gpu-fleet-gpu-01<br/>NVIDIA L4, per session<br/>driver, device plugin, DCGM,<br/>node-problem-detector"]
+    cp["gpu-fleet-cp-01<br/>fr-par-2, control plane, always on<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator,<br/>Garage checkpoint store"]
+    gpu["gpu-fleet-gpu-01<br/>any fr-par zone, NVIDIA L4, per session<br/>driver, device plugin, DCGM,<br/>node-problem-detector"]
     cp <-->|"API, pod network"| gpu
   end
 
@@ -51,10 +51,10 @@ flowchart TB
     gpuip["gpu-01 flexible IP<br/>allows 22"]
   end
 
-  subgraph pn["Private Network 172.16.32.0/22"]
+  subgraph pn["Private Network 172.16.32.0/22, regional: spans every fr-par zone"]
     direction LR
-    cp["gpu-fleet-cp-01<br/>172.16.32.10, reserved in IPAM<br/>API server advertises here<br/>pods 10.244.0.0/24"]
-    gpu["gpu-fleet-gpu-01<br/>172.16.32.20, reserved in IPAM<br/>pods: a /24 from 10.244.0.0/16"]
+    cp["gpu-fleet-cp-01<br/>zone fr-par-2<br/>172.16.32.10, reserved in IPAM<br/>API server advertises here<br/>pods 10.244.0.0/24"]
+    gpu["gpu-fleet-gpu-01<br/>zone: gpu_zone, fr-par-1 in D2a<br/>172.16.32.20, reserved in IPAM<br/>pods: a /24 from 10.244.0.0/16"]
     gpu -->|"kubeadm join,<br/>kubelet to API on 6443"| cp
     cp <-.->|"Flannel VXLAN,<br/>pinned with --iface-can-reach"| gpu
   end
@@ -75,6 +75,12 @@ Flannel would pick the interface with the default route, which is the public one
 the bootstrap pins it with `--iface-can-reach` to the control plane's private address.
 `node_ip_mode` can move the whole cluster onto public addresses with one variable, in
 case the Private Network ever misbehaves.
+
+The Private Network belongs to the region, not a zone, and that paid off in Session D:
+fr-par-2 had no L4 free, so `gpu_zone` put the GPU node in fr-par-1. Its IP, server,
+private NIC and security group are the only zonal pieces that moved. It joined the
+control plane across zones over the private network and ran the whole of D2a from
+there, checkpoints to the control plane included.
 
 ## What runs on the control plane
 
@@ -157,7 +163,7 @@ flowchart TB
     drv["nvidia-driver-daemonset<br/>builds and loads 595.91.07"]
     tk["nvidia-container-toolkit<br/>configures containerd"]
     val["operator-validator,<br/>cuda-validator"]
-    dp["nvidia-device-plugin<br/>advertises nvidia.com/gpu"]
+    dp["nvidia-device-plugin<br/>time slicing ts-4:<br/>one L4 as nvidia.com/gpu: 4"]
     gfd["gpu-feature-discovery<br/>nvidia.com/* labels"]
     dcgm["nvidia-dcgm<br/>host engine, port 5555"]
     dcgme["nvidia-dcgm-exporter<br/>34 counters from Git"]
@@ -168,7 +174,7 @@ flowchart TB
     nfdw["nfd-worker"]
     ne["node-exporter"]
     kp["kube-proxy, kube-flannel"]
-    work["GPU workloads"]
+    work["GPU workloads<br/>tenant pods, the trainer"]
   end
 
   drv -->|"kernel module"| l4
@@ -180,7 +186,7 @@ flowchart TB
   gfd -->|"reads GPU"| l4
   npd -->|"reads"| kmsg
   drv -.->|"Xid lines"| kmsg
-  work -->|"nvidia.com/gpu: 1"| kubelet
+  work -->|"nvidia.com/gpu: 1 of 4"| kubelet
 
   classDef nv fill:#76b900,stroke:#4a7300,color:#000
   class drv,tk,val,dp,gfd,dcgm,dcgme nv
@@ -191,7 +197,8 @@ flowchart TB
 Apart from Prometheus scraping them, the GPU node's components never call a control
 plane component directly. They go through the API server: one component writes an
 object, and another is watching for it. Steps 1 to 8 are how a new GPU node becomes
-schedulable, which Session A ran; A to C are the fault path from Session C.
+schedulable, which Session A ran; A to C are the fault path from Session C, and D is
+the training job's checkpoints from Session D.
 
 ```mermaid
 flowchart LR
@@ -201,6 +208,7 @@ flowchart LR
     kubelet["kubelet"]
     npd["node-problem-detector"]
     dcgme["dcgm-exporter"]
+    trainer["trainer pod"]
   end
 
   subgraph cp["control plane"]
@@ -210,6 +218,7 @@ flowchart LR
     sch["kube-scheduler"]
     gr["gpu-remediator"]
     prom["Prometheus"]
+    garage["Garage S3 :3900"]
   end
 
   nfdw -->|"1. NodeFeature: PCI vendor 10de"| api
@@ -217,13 +226,14 @@ flowchart LR
   nfdm -->|"3. label pci-10de.present=true"| api
   api -->|"4. label matches"| gop
   gop -->|"5. driver, toolkit, plugin, DCGM"| api
-  dp -->|"6. nvidia.com/gpu: 1"| kubelet
+  dp -->|"6. nvidia.com/gpu: 4,<br/>time-sliced"| kubelet
   kubelet -->|"7. allocatable GPU"| api
   sch -->|"8. binds GPU pods"| api
   npd -->|"A. GPUUnhealthy=True"| api
   api -->|"B. watch event"| gr
   gr -->|"C. cordon, Event, evictions"| api
   prom -->|"scrape"| dcgme
+  trainer -->|"D. checkpoints and step log,<br/>pod network"| garage
 ```
 
 ## GitOps: what ArgoCD applies, and in what order

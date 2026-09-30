@@ -1,54 +1,243 @@
 # Session D: goodput, burn-in and tenancy
 
-!!! info "Status: D1 done, no GPU time yet"
-    The object store and the tenants are in Git for ArgoCD to deploy on the control
-    plane. The trainer, the
-    goodput analysis and the time slicing config are tested without a GPU, and
-    the D2 scripts are written. Nothing below has touched the L4. I'll write the
-    results from captured output after the GPU sittings, as I did for Sessions A to C.
+!!! success "D2a done, 2026-09-30. D2b, the burn-in, is next"
+    One commit took the L4 from 1 schedulable GPU to 4 in 88 seconds, three pods from
+    two tenants shared it, and the quota refused a third pod in the same tenant. Then a
+    training job lost its pod to an injected XID 79, waited out the gated return to
+    service, resumed from its step 200 checkpoint in Garage and finished: **66.4%
+    goodput** over 23 minutes, with 26% of the run lost to the outage. Criteria 1 to 4
+    pass. The burn-in and the runbook are still to do, and the XID was injected; the
+    GPU never failed.
 
 **Scope:** time slicing the L4 through the GPU Operator, with two tenant namespaces
 under ResourceQuota. A PyTorch training job that checkpoints to object storage, gets
-interrupted by an injected XID 79, and resumes, with the time it lost measured. A
-3 hour burn-in with a stability record. And the acceptance runbook, filled in with
-commands that ran on this cluster.
+interrupted by an injected XID 79 and resumes, with the time it lost measured. A 3 hour
+burn-in with a stability record, and the acceptance runbook, filled in with commands
+that ran on this cluster.
 
-## Acceptance test
+Here's the interrupted run. Times are UTC: the injection from the GPU node's clock,
+the training events from the trainer's step log, the rest from Kubernetes.
 
-1. **Time slicing, from a commit.** One line in `gitops/apps/gpu-operator.yaml`, adding
-   `gitops/values/gpu-operator-time-slicing.yaml` to its value files, takes the node
-   from `nvidia.com/gpu: 1` to `4`, through ArgoCD, with nobody on the node. Pods from both tenants run on the one L4 at the same time, and `nvidia-smi`
-   shows their processes side by side.
-2. **Quotas bite.** Each tenant namespace has a ResourceQuota of 2 GPUs. A third GPU
-   pod in the same namespace is rejected by the API server, with the quota error
-   captured.
-3. **Goodput, measured.** A training job runs, checkpoints, is interrupted by an
-   injected XID 79 (Session C's remediation drains it), waits for the gated return to
-   service, and resumes from its last checkpoint to finish. Total time, useful compute
-   time and lost time come out of step timestamps and Kubernetes event timestamps,
-   and every input is published.
-4. **Checkpoints outlive the node.** They're written to an S3-compatible store on the
-   control plane, not to the GPU node's disk.
-5. **Burn-in.** 3 hours of sustained tensor load, with a record of temperature,
-   clocks, throttle reasons, ECC deltas and XID count, and a `dcgmi diag -r 3` before
-   and after, timed. Labelled as a scaled-down version of a multi-day campaign.
-6. **The runbook.** Every check in the [acceptance runbook](runbook.md) has a command,
-   an expected result and a failure path, taken from what ran in Sessions A to D.
+```mermaid
+sequenceDiagram
+  participant p1 as trainer pod 1
+  participant g as Garage on the control plane
+  participant inj as inject-xid.sh
+  participant rem as node-problem-detector and gpu-remediator
+  participant job as Job controller
+  participant op as make return-to-service
+  participant p2 as trainer pod 2
 
-## Plan
+  p1->>g: 19:47:37.1 checkpoint at step 200 (2.1 s)
+  inj->>rem: 19:48:35.363 NVRM Xid 79 line in the kernel log (SIMULATED)
+  rem->>p1: GPUUnhealthy=True, cordon, eviction, SIGTERM
+  p1->>g: flush the step log on the way out, last step logged 394 at 19:48:36.0
+  job->>p2: 19:48:46 replacement created, Pending on the cordoned node
+  Note over rem,op: 5 minute lookback, until 19:53:35
+  op->>rem: 19:54:15 dcgmi diag -r 2, passed in 6 s
+  op->>rem: 19:54:33 node-problem-detector reset, uncordoned
+  g->>p2: 19:54:36.9 load the step 200 checkpoint (1.76 s)
+  p2->>g: 19:55:40.7 checkpoint at step 400, then every 200 steps
+  p2->>g: 20:09:30.3 step 3000 checkpointed, done
+```
+
+## Results
+
+| # | Acceptance criterion | Result | Evidence |
+|---|---|---|---|
+| 1 | One commit takes the node from 1 GPU to 4 through ArgoCD, and pods from both tenants share the L4, with their processes side by side in `nvidia-smi` | **Pass.** Pushed at 19:38:48, allocatable 4 at 19:40:16. Three pods, one L4 UUID, three `python3` processes at 1400, 2424 and 3448 MiB | [`session-d-tenancy.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-tenancy.txt), [`session-d-timeline.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-timeline.txt) |
+| 2 | A third GPU pod in a tenant with 2 GPUs of quota is refused by the API server | **Pass.** `exceeded quota: gpu, requested: requests.nvidia.com/gpu=1, used: requests.nvidia.com/gpu=2, limited: requests.nvidia.com/gpu=2`, with one slice still free on the node | [`session-d-quota-refusal.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-quota-refusal.txt) |
+| 3 | A training job, interrupted by XID 79, resumes from its checkpoint and finishes, with total, useful and lost time measured from published inputs | **Pass.** 66.4% goodput: 918.2 s useful out of 1383 s. 194 steps redone, 360.9 s of outage | [`session-d-goodput.json`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput.json), [step logs](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/tree/main/docs/artifacts/session-d-goodput), [`session-d-goodput-job.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput-job.txt) |
+| 4 | Checkpoints live off the GPU node | **Pass.** The second pod read the step 200 checkpoint from Garage on the control plane, in another zone, in 1.76 s | Pod 2's `start` event in [`goodput-kjxgc.jsonl`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput/goodput-kjxgc.jsonl) |
+| 5 | Burn-in: 3 hours of tensor load, a stability record, `dcgmi diag -r 3` before and after | Not run yet, D2b | |
+| 6 | The runbook, every check with a command, an expected result and a failure path | Not written yet, D3 | |
+
+## Where the 1383 seconds went
+
+The Job ran from 19:46:31 to 20:09:34 by the API server's clock. The categories are
+the ones I fixed before the run, and they add up to the total to the millisecond.
+
+```mermaid
+%%{init: {"themeVariables": {"pie1": "#76b900", "pie2": "#e06666", "pie3": "#f6b26b", "pie4": "#6fa8dc", "pie5": "#b7b7b7", "pie6": "#8e7cc3", "pieSectionTextColor": "#000"}}}%%
+pie showData
+  title One interrupted run, 1383 s
+  "Useful steps" : 918.2
+  "Outage" : 360.9
+  "Redone steps" : 58.7
+  "Checkpoint writes" : 32.4
+  "Other" : 11.1
+  "Restore" : 1.8
+```
+
+Checkpoints cost very little. Fifteen writes of roughly 270 MB each (my estimate from
+the model: 33.6 million fp32 weights plus the same again for SGD momentum) took 2.0 to
+2.5 s each, from a node in fr-par-1 to Garage in fr-par-2, which is 2.3% of the run
+for a checkpoint about every 64 seconds. "Other" is the first pod starting (3.95 s from
+the Job's start to its first log line), the Job noticing the end (3.69 s) and the
+loop's own logging.
+
+The outage is what matters. Here it is taken apart:
+
+| From | To | Seconds | What |
+|---|---|---|---|
+| 19:48:36.0 | 19:53:35.4 | 299.4 | The 5 minute lookback, counted from the injection |
+| 19:53:35.4 | 19:54:15 | about 40 | Waiting for me to run `make return-to-service` |
+| 19:54:15 | 19:54:21 | 6 | `dcgmi diag -r 2` |
+| 19:54:21 | 19:54:33 | 12 | Restarting node-problem-detector so its condition resets, then uncordoning |
+| 19:54:33 | 19:54:36.9 | 3.9 | Scheduling, container start from the cached image, Python and CUDA start |
+
+So 83% of the outage is the lookback, and 11% is a person. The diagnostic, the thing
+that actually decides whether the GPU can go back into service, is under 2%. The
+lookback exists because node-problem-detector replays kernel log lines up to 5 minutes
+old when it restarts; resetting it any sooner would bring the XID straight back.
+Take the whole outage away and the same run comes out at 89.8% (918.2 out of 1022 s),
+and that's arithmetic, not a measurement.
+
+One interruption cost about 7 minutes here: the outage, 194 redone steps and the
+restore, 421 s in all. What that does to a real job's goodput depends on how often
+its GPUs fail, which one run on one node can't say.
+
+## Timeline
+
+From [`session-d-timeline.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-timeline.txt), the step logs and the
+captures. The GPU node ran in fr-par-1 this time, because fr-par-2 had no L4 free; see
+[what changed](#what-i-changed-because-of-the-session).
+
+| Time | Event |
+|---|---|
+| 19:10:15 | GPU node up in fr-par-1, joined to the control plane in fr-par-2 over the private network |
+| 19:27:01 to 19:30:33 | Trainer image pulled onto the node: 4.28 GB in 3 min 23 s |
+| 19:38:48 | Time slicing commit pushed to `main` |
+| 19:39:02 | `tenancy-wait` starts: allocatable `nvidia.com/gpu` is 1 |
+| 19:40:16 | Allocatable is 4. The node is labelled `NVIDIA-L4-SHARED`, `replicas=4`, `sharing-strategy=time-slicing` |
+| 19:40:55 | Three tenant pods Running; a fourth in tenant-a refused by the quota |
+| 19:43:57 | First goodput Job. Its pod crashes at start, see [below](#two-things-that-went-wrong) |
+| 19:46:31 | Second Job. First step at 19:46:35.4, 0.31 s a step from there on |
+| 19:47:37.1 | Checkpoint at step 200 |
+| 19:48:35.363 | **XID 79 injected.** Step 394 ends 0.64 s later, the last one logged |
+| 19:48:46 | Replacement pod created, Pending |
+| 19:54:15 to 19:54:21 | `dcgmi diag -r 2`: software, memory and PCIe Pass |
+| 19:54:33 | Uncordoned |
+| 19:54:38.7 | Replacement starts training, resumed from step 200 |
+| 20:09:30.3 | Step 3000 checkpointed |
+| 20:09:34 | Job complete |
+
+## From a commit to four GPUs
+
+Nobody touched the node. The commit added one values file to the gpu-operator
+Application, and the rest followed from it:
+
+```mermaid
+flowchart LR
+  commit["commit 8f6a325<br/>pushed 19:38:48<br/>adds the ts-4 values file"]
+  argo["ArgoCD<br/>syncs gpu-operator"]
+  cp["ClusterPolicy and<br/>device-plugin-config ConfigMap<br/>default: ts-4, replicas: 4"]
+  dp["device plugin on the GPU node<br/>one L4 advertised as 4"]
+  node["node allocatable<br/>nvidia.com/gpu: 4 at 19:40:16"]
+
+  subgraph ta["tenant-a, quota 2 GPUs"]
+    a1["share-a1<br/>holds 1 GiB"]
+    a2["share-a2<br/>holds 2 GiB"]
+    a3["share-a3<br/>refused: exceeded quota"]
+  end
+  subgraph tb["tenant-b, quota 2 GPUs"]
+    b1["share-b1<br/>holds 3 GiB"]
+  end
+  l4["one NVIDIA L4<br/>UUID 30b37b65-...<br/>3 processes: 1400, 2424, 3448 MiB"]
+
+  commit --> argo --> cp --> dp --> node
+  node -->|"scheduler binds"| ta
+  node -->|"scheduler binds"| tb
+  a1 --> l4
+  a2 --> l4
+  b1 --> l4
+
+  classDef nv fill:#76b900,stroke:#4a7300,color:#000
+  classDef no fill:#f4cccc,stroke:#990000,color:#000
+  class dp,l4 nv
+  class a3 no
+```
+
+Each pod held a different amount of GPU memory so I could tell them apart in
+`nvidia-smi`, which I ran in the GPU Operator's driver container because it shares the
+host's PID namespace; a tenant's own container only sees itself. Each process shows
+its allocation plus about 376 MiB of CUDA context. All three pods printed the same
+GPU UUID. The refusal came from the API server's quota admission with one slice still
+free, so it's the quota doing the refusing, not a lack of capacity.
+
+Time slicing gives no isolation, and nothing in this run pretends otherwise: the three
+processes shared the L4's memory and would share its faults. I stopped the tenants
+before the goodput run, so I didn't watch an XID drain them; the controller evicts
+every pod on the node that isn't a DaemonSet's, and that's what would have happened.
+
+## What the run doesn't prove
+
+The fault was simulated, exactly as in Session C. The trainer received SIGTERM from a
+normal eviction while its GPU still worked, so it exited cleanly and flushed its log.
+A real XID 79 takes the GPU off the bus, and the process would most likely die on a
+CUDA error in the middle of a step. The loop flushes the log on any exception, not
+only SIGTERM, but that path never ran on the L4.
+
+It resumed on the node that failed, because there's only one. On a fleet the
+replacement goes to another node, and the checkpoint store on the control plane is
+the part of this design that carries over.
+
+And one data point is one data point. 66.4% is the goodput of a 23 minute job that
+lost its GPU once; the same outage on a 10 hour job would be about 1% of it.
+
+## Two things that went wrong
+
+**The first Job never trained.** Its pod died in under a second with
+`getpwuid(): uid not found: 65532`. The traceback, saved in
+[`session-d-goodput-first-attempt.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput-first-attempt.txt), goes
+from `torch.optim.SGD` into `torch._dynamo`, which works out an Inductor cache
+directory from `getpass.getuser()`. Nothing gets compiled, but constructing the
+optimizer is enough. The image runs as uid 65532, which has no `/etc/passwd` entry,
+and the CPU smoke test in the image build ran before the `USER` line, as root, so it
+couldn't see this. `getuser()` checks `USER` before `/etc/passwd`, so I set it in the
+Job and started a second one, 2.5 minutes later. The goodput figure covers the second
+Job only. The script had also printed "training" over the crash, and now it checks.
+
+**The replacement pod took 10 seconds to appear.** The eviction reached the trainer
+within about a second of the injection: step 394 finished 0.64 s after it, and the
+step it was computing when SIGTERM arrived never got logged. The Job only created the
+replacement at 19:48:46, though. A Job with a `podFailurePolicy` replaces a pod once
+it has fully terminated, so those 10 s are the old pod shutting down: the flush, CUDA
+teardown and the kubelet reporting it gone. I didn't capture the kubelet's side, so I
+can't split them further. It cost nothing here, since the node stayed cordoned for
+another 6 minutes anyway.
+
+The step log flush on exit, the bug the end to end test found in D1, earned its place
+on real hardware: the last periodic flush was at step 387, so steps 388 to 394 are in
+the log only because of it.
+
+## What I changed because of the session
+
+| Change | Reason |
+|---|---|
+| `USER=trainer` in the Job, then in the image, and the build's smoke test now runs as the image's own user | The first Job died on `getpass.getuser()` |
+| `goodput.sh start` checks the trainer is Running before saying so | It announced "training" over a crashed pod |
+| A `gpu_zone` variable puts the GPU node in another zone of the region | fr-par-2 had no L4; moving the whole cluster would have rebuilt the control plane |
+| `make down` asks the Scaleway API what's left in the GPU zone | A failed boot in fr-par-1 left a 150 GB volume billing where Terraform couldn't see it ([Findings](findings.md)) |
+
+---
+
+## How I built it
+
+### The plan
 
 Two billed sittings, so nothing depends on me staying at the keyboard for five hours.
 
 | Part | What | Your time | GPU time |
 |---|---|---|---|
 | D1, authoring | Object store, tenants and quotas, the time slicing change (not merged), the training job and its goodput analysis with tests, burn-in and capture scripts. Deployed to the control plane where it can be, and checked there for free | 30 to 45 min, done | none |
-| D2a, live | GPU up, pre-pull the PyTorch image, merge the time slicing commit, tenants and quotas, then the interrupted training run, GPU down | about 1.5 h | about 1.5 h |
+| D2a, live | GPU up, pre-pull the PyTorch image, merge the time slicing commit, tenants and quotas, then the interrupted training run, GPU down | about 1.5 h, done | about 1.5 h |
 | D2b, live | GPU up, `dcgmi diag -r 3`, 3 hour burn-in, `dcgmi diag -r 3` again, capture, GPU down | about 15 min, plus checking in | about 3.5 h |
 | D3, write-up | This page and the runbook from the artifacts | about 30 min | none |
 
 About 5 GPU hours in total, roughly EUR 4 at EUR 0.79/h.
 
-## Decisions
+### Decisions
 
 | Decision | Choice | Why |
 |---|---|---|
@@ -63,27 +252,27 @@ About 5 GPU hours in total, roughly EUR 4 at EUR 0.79/h.
 | Goodput definition | Useful time is time spent on steps that made it into the final model. Lost time is the outage plus any steps redone after the last checkpoint | Written down before the run, so the number can't be shaped afterwards |
 | Burn-in load | `dcgmproftester13` on the tensor cores, as in Session B | Known to hold the L4 at its power limit; Session B already has 20 minutes of it for comparison |
 
-## Things I'll state up front
+### Things I stated up front
 
 - **Time slicing has no isolation.** Tenants share the GPU's memory and fault domain.
   An XID from one tenant's process drains everyone on the node, and Session C's
-  controller does exactly that. The write-up will show it rather than hide it.
+  controller does exactly that.
 - **The outage in the goodput run includes Session C's 5 minute lookback.** That's
   the price of a return to service node-problem-detector can't undo, and it belongs
   in the lost time.
 - **One GPU node means the job can only resume on the node that failed.** On a fleet
   it would move to another node. The checkpoint store is the part that carries over.
 
-## What D1 built, and how I checked it without a GPU
+### What D1 built, and how I checked it without a GPU
 
 | Piece | Where | Checked by |
 |---|---|---|
 | Tenants and quotas | `gitops/manifests/tenants/`, wave 4 | `tenant-a` and `tenant-b`, each with a ResourceQuota of `requests.nvidia.com/gpu: 2`. Schema-checked with kubeconform; the refusal itself needs the GPU node |
 | Checkpoint store | `gitops/manifests/checkpoint-store/`, wave 5 | The Garage v2.4.1 binary, run locally with this exact `garage.toml`: a 40 MB multipart upload and download, and a restart that kept the bucket and key |
-| Time slicing config | `gitops/values/gpu-operator-time-slicing.yaml`, not yet listed in the Application | Parsed by the device plugin's own config loader at v0.20.0 (`make test-time-slicing`). A misspelt key and `replicas: 1` both fail, as they should |
+| Time slicing config | `gitops/values/gpu-operator-time-slicing.yaml`, listed in the Application during D2a | Parsed by the device plugin's own config loader at v0.20.0 (`make test-time-slicing`). A misspelt key and `replicas: 1` both fail, as they should |
 | Training loop and store | `workloads/goodput/trainer/` | 8 unit tests, plus an end to end test against a real Garage server: interrupted at step 130, resumed from the checkpoint at 100, 30 steps redone, only the two newest checkpoints kept. CI runs it against the pinned Garage image |
 | Goodput analysis | `workloads/goodput/trainer/goodput.py` | Unit tests on hand-made step logs with known answers |
-| Trainer image | `workloads/goodput/Dockerfile`, built by CI, pinned by digest in `job.yaml` | The build runs the PyTorch backend on CPU for two steps and a checkpoint round trip, and publishes nothing if that fails. It has never run on a GPU: bf16 autocast and the step time are for D2a to show |
+| Trainer image | `workloads/goodput/Dockerfile`, built by CI, pinned by digest in `job.yaml` | The build runs the PyTorch backend on CPU for two steps and a checkpoint round trip, and publishes nothing if that fails. On the L4 in D2a it ran at 0.306 s a step, after the `USER` fix described above |
 | D2 scripts | `scripts/tenancy.sh`, `goodput.sh`, `burn-in.sh` | shellcheck, and every manifest they generate rendered and schema-checked |
 
 The end to end test found a real bug before any GPU time. An evicted attempt's step
@@ -92,7 +281,7 @@ and would have been counted as outage, not redone work. The test expected 30 red
 steps and got 28. The loop now flushes the log on any exit, and SIGTERM is turned into
 a clean exit so that the flush runs.
 
-## The D2 steps
+### The D2 steps
 
 D2a, about 1.5 hours of GPU time:
 
@@ -109,17 +298,14 @@ D2b, about 3.5 hours of GPU time:
 1. `make up`, `make burn-in-diag LABEL=before`, `make burn-in`.
 2. Three hours later, `make burn-in-capture`, `make burn-in-diag LABEL=after`, `make down`.
 
-## Still open
+### What D2a answered, and what's still open
 
-- What happens to a running GPU pod when the device plugin restarts with the new
-  config. I start the tenants after the switch, so it doesn't matter for the
-  results, but I'd like to know.
-- How long `dcgmi diag -r 3` takes on an L4. Level 2 took 6 seconds in Session C.
-- How long the 4.3 GB PyTorch image takes to pull on the GPU node.
-- How fast a training step really is. My estimate is about 0.2 seconds (13 TFLOP a
-  step in bf16), which puts 3000 steps at about 10 minutes and a checkpoint every
-  40 seconds. The first run will tell.
+| Question before D2a | Answer |
+|---|---|
+| How long does the 4.3 GB PyTorch image take to pull? | 3 min 23 s for 4.28 GB, so pre-pulling was worth it |
+| How fast is a training step? | 0.306 s median, 0.317 s at the 99th percentile, against my estimate of 0.2 s. 3000 steps took about 15 minutes |
+| How long from the commit to 4 GPUs? | 88 s, ArgoCD's poll included |
 
-## What happened
-
-Not run yet.
+Still open: what a running GPU pod sees when the device plugin restarts with a new
+config (I started the tenants after the switch), and how long `dcgmi diag -r 3` takes
+on an L4, which D2b measures.

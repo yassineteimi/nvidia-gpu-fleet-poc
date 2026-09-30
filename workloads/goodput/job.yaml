@@ -38,14 +38,16 @@ spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: trainer
-          image: ghcr.io/yassineteimi/goodput-trainer@sha256:20709021478483ea9473a89cd753a737fd1e74fad2e71cb2634bb70f599377fa
+          # Built from c700754, which sets USER in the image and smoke-tests as
+          # uid 65532. The D2a run used sha256:20709021..., with USER from this Job.
+          image: ghcr.io/yassineteimi/goodput-trainer@sha256:feda704575fb07b7cfbb56e567bc76d22779fd8481e5ff72c632f0677860f945
           envFrom:
             - secretRef:
                 name: checkpoint-s3
           env:
-            # The image runs as uid 65532, which has no /etc/passwd entry.
-            # Something on torch's training path calls getpass.getuser(),
-            # which reads USER before it falls back to /etc/passwd and raises.
+            # Also set in the image now. uid 65532 has no /etc/passwd entry, and
+            # building the SGD optimizer imports torch._dynamo, which calls
+            # getpass.getuser(); that reads USER before /etc/passwd.
             - name: USER
               value: trainer
             - name: RUN_ID

@@ -28,6 +28,7 @@ spec:
         releaseName: gpu-operator
         valueFiles:
           - $values/gitops/values/gpu-operator.yaml
+          - $values/gitops/values/gpu-operator-time-slicing.yaml
 
     - repoURL: https://github.com/yassineteimi/nvidia-gpu-fleet-poc
       targetRevision: main

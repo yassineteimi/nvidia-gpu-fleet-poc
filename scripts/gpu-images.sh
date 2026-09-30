@@ -18,7 +18,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 require_tools curl jq terraform
 load_env
 
-ZONE="${1:-$(tf_output zone)}"
+ZONE="${1:-$(tf_output gpu_zone)}"
 ZONE="${ZONE:-fr-par-2}"
 TYPE="${2:-$(tf_output gpu_node_type)}"
 TYPE="${TYPE:-L4-1-24G}"

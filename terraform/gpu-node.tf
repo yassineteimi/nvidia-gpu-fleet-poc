@@ -12,6 +12,7 @@
 
 resource "scaleway_instance_ip" "gpu_node" {
   count = var.gpu_node_enabled ? 1 : 0
+  zone  = local.gpu_zone
 
   type = "routed_ipv4"
   tags = local.tags
@@ -19,6 +20,7 @@ resource "scaleway_instance_ip" "gpu_node" {
 
 resource "scaleway_instance_server" "gpu_node" {
   count = var.gpu_node_enabled ? 1 : 0
+  zone  = local.gpu_zone
 
   name              = local.gpu_node_name
   type              = var.gpu_node_type
@@ -50,6 +52,7 @@ resource "scaleway_instance_server" "gpu_node" {
 
 resource "scaleway_instance_private_nic" "gpu_node" {
   count = var.gpu_node_enabled ? 1 : 0
+  zone  = local.gpu_zone
 
   server_id          = scaleway_instance_server.gpu_node[0].id
   private_network_id = scaleway_vpc_private_network.main.id

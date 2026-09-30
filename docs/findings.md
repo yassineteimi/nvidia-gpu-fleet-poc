@@ -302,6 +302,21 @@ general impression instead of Scaleway's quota table, and it was wrong; the page
 says what the table says. The failure did prove one thing: Scaleway accepts
 `kapsule_noble` for an L4, because this time the image lookup passed.
 
+### An L4 shortage in one zone doesn't have to move the cluster
+
+In Session D, `make up` failed with `L4-1-24G is out of stock` in fr-par-2. My
+documented fallback, pl-waw-2, moves both nodes and the Private Network, which would
+have rebuilt the control plane and lost etcd, ArgoCD, the Prometheus history and the
+checkpoint store. Private Networks are regional, though, so the GPU node can sit in
+another zone of fr-par and still join over the private network. A `gpu_zone` variable
+now moves only the GPU node's four zonal resources: its IP, the server, its private
+NIC and its security group.
+
+Scaleway's availability API (`/instance/v1/zones/<zone>/products/servers/availability`)
+left `L4-1-24G` out of fr-par-2's list entirely during the shortage, rather than
+reporting it as `shortage`. A missing entry there means "none right now", not
+necessarily "never offered".
+
 ## Node bootstrap
 
 ### `fuser` isn't on a minimal Ubuntu cloud image

@@ -1,6 +1,10 @@
 locals {
   tags = ["gpu-fleet-poc", var.cluster_name]
 
+  # Every zonal resource of the GPU node (its IP, server, private NIC and
+  # security group) lives here. Nothing of the control plane does.
+  gpu_zone = var.gpu_zone != "" ? var.gpu_zone : var.zone
+
   # The key material wins when the scripts supply it. The file path is the
   # fallback for running Terraform by hand, and it is wrapped in try() because
   # Terraform evaluates both branches of a conditional, so an unreadable path

@@ -49,8 +49,13 @@ output "node_ip_mode" {
 }
 
 output "zone" {
-  description = "Zone both nodes run in."
+  description = "Zone the control plane runs in, and the GPU node unless gpu_zone says otherwise."
   value       = var.zone
+}
+
+output "gpu_zone" {
+  description = "Zone the GPU node runs in."
+  value       = local.gpu_zone
 }
 
 output "kubernetes_minor" {

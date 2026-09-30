@@ -10,12 +10,30 @@ variable "region" {
 
 variable "zone" {
   description = <<-EOT
-    Scaleway zone for both instances. fr-par-2 is the primary choice because it
-    carries L4 stock. pl-waw-2 is the documented fallback when fr-par-2 is out of
-    L4 capacity. Changing this also requires changing the region.
+    Scaleway zone for the control plane, and for the GPU node unless gpu_zone
+    is set. fr-par-2 is the primary choice because it carries L4 stock. Moving
+    this zone rebuilds the control plane; for a GPU shortage, set gpu_zone
+    instead. pl-waw-2 (with region pl-waw) is the fallback for a fresh cluster.
   EOT
   type        = string
   default     = "fr-par-2"
+}
+
+variable "gpu_zone" {
+  description = <<-EOT
+    Zone for the GPU node only, when it differs from the control plane's. Empty
+    means the same zone as the control plane. The Private Network is regional,
+    so any zone in the same region works: when fr-par-2 has no L4 free, set this
+    to fr-par-1 and the control plane stays where it is. A zone in another
+    region can't reach the Private Network.
+  EOT
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = var.gpu_zone == "" || startswith(var.gpu_zone, "${var.region}-")
+    error_message = "gpu_zone must be in the same region as the Private Network (var.region)."
+  }
 }
 
 variable "cluster_name" {

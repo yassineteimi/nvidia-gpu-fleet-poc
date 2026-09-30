@@ -108,7 +108,10 @@ resource "scaleway_instance_security_group" "control_plane" {
   }
 }
 
+# Security groups are zonal, so this one follows the GPU node's zone. Moving
+# the GPU node to another zone replaces it, which touches nothing else.
 resource "scaleway_instance_security_group" "gpu_node" {
+  zone                    = local.gpu_zone
   name                    = "${var.cluster_name}-gpu"
   description             = "GPU node: SSH from admin ranges"
   inbound_default_policy  = "drop"

@@ -2,7 +2,7 @@
 scripts/goodput.sh runs this in the cluster, where the store is reachable,
 and saves the output next to the rest of the evidence.
 
-  python -m trainer.dump <run id>
+  python3 -m trainer.dump <run id>
 """
 
 import json

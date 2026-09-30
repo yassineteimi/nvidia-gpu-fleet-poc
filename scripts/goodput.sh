@@ -87,7 +87,7 @@ case "${1:-status}" in
     img="$(image)"
     log "pulling $img onto the GPU node, about 4 GB"
     started="$(stamp)"
-    one_off_pod trainer-prepull "$img" python -c "import torch; print('torch', torch.__version__)"
+    one_off_pod trainer-prepull "$img" python3 -c "import torch; print('torch', torch.__version__)"
     phase="$(wait_done trainer-prepull 1800)"
     {
       echo "prepull started=$started finished=$(stamp) phase=$phase image=$img"
@@ -129,7 +129,7 @@ case "${1:-status}" in
     [ -n "$end" ] || die "the $JOB Job hasn't completed; nothing to measure yet"
 
     log "reading run $uid's step logs from the bucket"
-    one_off_pod goodput-dump "$(image)" python -m trainer.dump "$uid"
+    one_off_pod goodput-dump "$(image)" python3 -m trainer.dump "$uid"
     phase="$(wait_done goodput-dump 300)"
     [ "$phase" = "Succeeded" ] || die "the log dump pod ended $phase: $(kubectl_cp -n "$NS" logs goodput-dump 2>&1 | tail -5)"
     dir="$OUT/session-d-goodput"

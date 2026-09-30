@@ -48,7 +48,7 @@ spec:
   containers:
     - name: main
       image: $(image)
-      command: ["python", "-c"]
+      command: ["python3", "-c"]
       args:
         - |
           import os, time, torch

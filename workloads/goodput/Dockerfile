@@ -6,12 +6,22 @@
 # the GPU node before the timed run starts.
 FROM pytorch/pytorch:2.11.0-cuda12.8-cudnn9-runtime@sha256:eee11b3b3872a8c838e35ef48f08b2d5def2080902c7f666831310ca1a0ef2be
 
+# torch lives in Ubuntu 24.04's system Python 3.12, which refuses pip installs
+# unless told otherwise (PEP 668). The base image put torch there the same way,
+# and nothing else in this single-purpose image uses that Python.
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --break-system-packages -r requirements.txt
 COPY trainer/ trainer/
+
+# Smoke test at build time, on CPU: every module imports, and the PyTorch
+# backend takes a step and round-trips a checkpoint. No image if it doesn't.
+RUN python3 -c "import boto3; from trainer import dump, goodput, loop, s3, store; \
+from trainer.torch_backend import TorchBackend; \
+b = TorchBackend(width=64, depth=2, batch=32, device='cpu'); b.step(); b.load(b.save()); b.step(); \
+print('trainer smoke test passed')"
 
 # Nothing here needs root. HOME is somewhere writable for torch's caches.
 ENV HOME=/tmp PYTHONUNBUFFERED=1
 USER 65532:65532
-ENTRYPOINT ["python", "-m", "trainer"]
+ENTRYPOINT ["python3", "-m", "trainer"]

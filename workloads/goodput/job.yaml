@@ -43,6 +43,11 @@ spec:
             - secretRef:
                 name: checkpoint-s3
           env:
+            # The image runs as uid 65532, which has no /etc/passwd entry.
+            # Something on torch's training path calls getpass.getuser(),
+            # which reads USER before it falls back to /etc/passwd and raises.
+            - name: USER
+              value: trainer
             - name: RUN_ID
               valueFrom:
                 fieldRef:

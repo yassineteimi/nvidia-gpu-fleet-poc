@@ -112,6 +112,8 @@ case "${1:-status}" in
     kubectl_cp -n "$NS" wait pod -l job-name="$JOB" --for=condition=Ready --timeout=600s >/dev/null
     sleep 20
     kubectl_cp -n "$NS" logs -l job-name="$JOB" --tail=5
+    phase="$(kubectl_cp -n "$NS" get pods -l job-name="$JOB" -o jsonpath='{.items[-1].status.phase}')"
+    [ "$phase" = "Running" ] || die "the trainer is $phase twenty seconds in, not Running. Its log is above; delete the Job before retrying: kubectl -n $NS delete job $JOB"
     log "training. Let it pass at least two checkpoints (step 400), then inject the XID"
     ;;
 

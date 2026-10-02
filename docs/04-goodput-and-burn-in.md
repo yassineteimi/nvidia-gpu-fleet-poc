@@ -6,7 +6,7 @@
     training job lost its pod to an injected XID 79, waited out the gated return to
     service, resumed from its step 200 checkpoint in Garage and finished: **66.4%
     goodput** over 23 minutes, with 26% of the run lost to the outage. Criteria 1 to 4
-    pass. The burn-in and the runbook are still to do, and the XID was injected; the
+    pass, and the runbook is written. The burn-in is still to do, and the XID was injected; the
     GPU never failed.
 
 **Scope:** time slicing the L4 through the GPU Operator, with two tenant namespaces
@@ -50,7 +50,7 @@ sequenceDiagram
 | 3 | A training job, interrupted by XID 79, resumes from its checkpoint and finishes, with total, useful and lost time measured from published inputs | **Pass.** 66.4% goodput: 918.2 s useful out of 1383 s. 194 steps redone, 360.9 s of outage | [`session-d-goodput.json`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput.json), [step logs](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/tree/main/docs/artifacts/session-d-goodput), [`session-d-goodput-job.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput-job.txt) |
 | 4 | Checkpoints live off the GPU node | **Pass.** The second pod read the step 200 checkpoint from Garage on the control plane, in another zone, in 1.76 s | Pod 2's `start` event in [`goodput-kjxgc.jsonl`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput/goodput-kjxgc.jsonl) |
 | 5 | Burn-in: 3 hours of tensor load, a stability record, `dcgmi diag -r 3` before and after | Not run yet, D2b | |
-| 6 | The runbook, every check with a command, an expected result and a failure path | Not written yet, D3 | |
+| 6 | The runbook, every check with a command, an expected result and a failure path | **Written**, with 11 of 13 checks backed by output from this cluster. Checks 6 and 8 fill in from D2b; their pass criteria are fixed in advance | [Runbook](runbook.md) |
 
 ## Where the 1383 seconds went
 
@@ -295,7 +295,8 @@ D2a, about 1.5 hours of GPU time:
 
 D2b, about 3.5 hours of GPU time:
 
-1. `make up`, `make burn-in-diag LABEL=before`, `make burn-in`.
+1. `make up`, then `make handover` (the runbook's read-only checks, ECC history
+   captured as text this time), `make burn-in-diag LABEL=before`, `make burn-in`.
 2. Three hours later, `make burn-in-capture`, `make burn-in-diag LABEL=after`, `make down`.
 
 ### What D2a answered, and what's still open

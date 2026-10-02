@@ -152,6 +152,13 @@ YAML
       echo "DCGM_FI_DEV_XID_ERRORS changes: $(q "max(changes(DCGM_FI_DEV_XID_ERRORS[${d}s]))") max value: $(q "max(max_over_time(DCGM_FI_DEV_XID_ERRORS[${d}s]))")"
       echo "== telemetry gaps"
       echo "temperature samples in the window: $(q "max(count_over_time(DCGM_FI_DEV_GPU_TEMP[${d}s]))")"
+      # One point a minute over the steady window: a minute whose last 60 s hold
+      # no temperature sample at all is a gap. Prometheus's range query leaves
+      # those minutes out, so the gap count is the minutes expected minus the
+      # minutes returned.
+      have="$(kubectl_cp get --raw "$PROM/api/v1/query_range?query=$(enc 'count_over_time(DCGM_FI_DEV_GPU_TEMP[60s])')&start=$(( s + 120 ))&end=$at&step=60" \
+        | jq '[.data.result[0].values[]? | select((.[1] | tonumber) > 0)] | length')"
+      echo "minutes without a temperature sample: $(( (at - s - 120) / 60 + 1 - have ))"
       echo "gpu-operator container restarts: $(q "sum(max_over_time(kube_pod_container_status_restarts_total{namespace=\"gpu-operator\"}[${d}s]) - min_over_time(kube_pod_container_status_restarts_total{namespace=\"gpu-operator\"}[${d}s]))")"
       echo "== clock event reasons, bitmask value: minutes seen"
       kubectl_cp get --raw "$PROM/api/v1/query_range?query=$(enc 'max(DCGM_FI_DEV_CLOCKS_EVENT_REASONS)')&start=$(( s + 60 ))&end=$at&step=60" \

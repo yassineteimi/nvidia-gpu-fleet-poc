@@ -1,5 +1,5 @@
 SHELL := /bin/bash
-.PHONY: help cluster argocd argocd-ui grafana-ui check-dcgm-image gpu-images up acceptance load load-stop inject-xid-dcgm capture-b capture-b-history test-rules workload workload-stop inject-xid return-to-service capture-c test-controller test-npd-rules down cost test-goodput test-time-slicing tenancy-wait tenancy tenancy-capture tenancy-stop prepull goodput goodput-status goodput-capture burn-in-diag burn-in burn-in-status burn-in-capture docs docs-serve lint shellcheck fmt test
+.PHONY: help cluster argocd argocd-ui grafana-ui check-dcgm-image gpu-images up acceptance load load-stop inject-xid-dcgm capture-b capture-b-history test-rules workload workload-stop inject-xid return-to-service capture-c test-controller test-npd-rules down cost test-goodput test-time-slicing tenancy-wait tenancy tenancy-capture tenancy-stop prepull goodput goodput-status goodput-capture handover burn-in-diag burn-in burn-in-status burn-in-capture docs docs-serve lint shellcheck fmt test
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -99,6 +99,9 @@ goodput-status: ## Where the goodput Job and its pods are
 
 goodput-capture: ## After the Job completes: step logs, Job timestamps, goodput
 	./scripts/goodput.sh capture
+
+handover:      ## Read-only handover check on the GPU node: versions, PCIe, ECC history, telemetry
+	./scripts/handover.sh
 
 burn-in-diag:  ## dcgmi diag -r 3 on the GPU node, timed (LABEL=before|after)
 	./scripts/burn-in.sh diag "$(LABEL)"

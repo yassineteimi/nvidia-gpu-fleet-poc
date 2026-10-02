@@ -166,7 +166,7 @@ flowchart TB
     dp["nvidia-device-plugin<br/>time slicing ts-4:<br/>one L4 as nvidia.com/gpu: 4"]
     gfd["gpu-feature-discovery<br/>nvidia.com/* labels"]
     dcgm["nvidia-dcgm<br/>host engine, port 5555"]
-    dcgme["nvidia-dcgm-exporter<br/>34 counters from Git"]
+    dcgme["nvidia-dcgm-exporter<br/>33 metrics from Git"]
   end
 
   subgraph other["other namespaces"]

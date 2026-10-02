@@ -19,7 +19,7 @@ flowchart LR
     load["gpu-load Job<br/>dcgmproftester13, tensor load"]
     l4["NVIDIA L4"]
     dcgm["nvidia-dcgm<br/>host engine, port 5555"]
-    exp["nvidia-dcgm-exporter<br/>34 counters"]
+    exp["nvidia-dcgm-exporter<br/>33 metrics from Git"]
     load -->|"real load"| l4
     dcgm -->|"NVML"| l4
     exp -->|"field values"| dcgm
@@ -57,7 +57,7 @@ in a UI.
 
 | # | Acceptance criterion | Result | Evidence |
 |---|---|---|---|
-| 1 | Prometheus scrapes the exporter, and every counter in the custom set is there, including the ones the exporter ships disabled | **Pass.** 34 of 34 | [`session-b-counters.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-counters.txt) |
+| 1 | Prometheus scrapes the exporter, and every counter in the custom set is there, including the ones the exporter ships disabled | **Pass.** All 33 metrics present. The set lists 34 fields; the 34th, `DCGM_FI_DRIVER_VERSION`, is a label the exporter attaches to every series, not a series of its own, so the capture had nothing to count for it | [`session-b-counters.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-counters.txt) |
 | 2 | A dashboard loaded from Git, not built in the UI, shows live data | **Pass.** Every panel with data to show had it. Two panels had a bug, which I found and fixed ([details](#the-dashboard-had-the-same-bug-as-the-alert)) | Screenshots below |
 | 3 | `GPUUtilisationCollapse` goes pending, then firing, after a real load job is killed | **Pass, with a caveat.** Pending 13:46:03, firing 13:47:03. The job had finished seconds before the kill | [`session-b-alert-timeline.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-alert-timeline.txt), [`session-b-load-timeline.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-load-timeline.txt) |
 | 4 | Every alert rule has a `promtool` unit test that passes offline | **Pass.** 12 test cases, 26 alert evaluations. I added one during the session | `make test-rules`, and the `test-rules` job in CI |
@@ -301,7 +301,7 @@ I wrote and checked everything before any of it reached the cluster.
 | Health checks for Application resources, so the sync waves actually wait | `gitops/bootstrap/argocd-values.yaml` | Copied from ArgoCD's documentation for v3.5.3 |
 | Storage that refuses volumes on the GPU node | `gitops/apps/local-path-provisioner.yaml`, `gitops/values/local-path-provisioner.yaml` | Every key exists in the chart's values at v0.0.37 |
 | kube-prometheus-stack, pinned to the control plane | `gitops/apps/kube-prometheus-stack.yaml`, `gitops/values/kube-prometheus-stack.yaml` | Every key exists in the chart's values at 91.4.1, and in the Grafana 13.2.5 and kube-state-metrics 8.5.0 subcharts it pins |
-| 34 DCGM counters, kept in Git | `gitops/values/gpu-operator.yaml` | Field names copied from dcgm-exporter 4.6.0-4.8.3's own counter file; the ConfigMap wiring traced through the operator's chart template and controller |
+| 34 DCGM fields, kept in Git: 33 metrics and the driver version as a label | `gitops/values/gpu-operator.yaml` | Field names copied from dcgm-exporter 4.6.0-4.8.3's own counter file; the ConfigMap wiring traced through the operator's chart template and controller |
 | 9 alert rules | `gitops/manifests/observability/gpu-alerts.yaml` | `promtool` 3.14.0, the version the chart deploys: syntax, then 11 test cases and 25 alert evaluations at the time. I broke four rules on purpose, and each time the matching test failed |
 | The dashboard, 21 panels | `gitops/manifests/observability/dashboards/gpu-fleet.json` | All 34 queries parse in `promtool`; every DCGM metric they use is in the counter set; `kustomize build` produces the ConfigMap with the sidecar's label |
 | The B2 scripts | `scripts/check-dcgm-image.sh`, `load.sh`, `inject-xid-dcgm.sh`, `capture-b.sh`, `grafana-ui.sh` | `shellcheck`. Every `dcgmproftester` and `dcgmi test --inject` flag read from DCGM's source; field IDs 230 and 1004 from `dcgm_fields.h` |

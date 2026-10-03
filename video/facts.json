@@ -1,0 +1,87 @@
+{
+  "_note": "Every number the video may show. Each one is copied from a file committed during a session; 'source' is the path and 'evidence' the exact line or values it comes from. Do not put a number on screen that isn't here.",
+  "context": {
+    "llama3_interruptions": {
+      "on_screen": "419 unexpected interruptions in 54 days of training on 16,384 GPUs",
+      "source": "https://arxiv.org/abs/2407.21783",
+      "evidence": "Meta, The Llama 3 Herd of Models (2024), section on reliability. External source, not this project's output; credit it on screen as 'Meta, Llama 3 paper'."
+    }
+  },
+  "session_a": {
+    "driver": {
+      "on_screen": "Driver 595.91.07, from a Git commit, onto a node that booted with none",
+      "source": "docs/artifacts/session-a-acceptance.txt",
+      "evidence": "PASS  driver in use is 595.91.07, the version pinned in Git / PASS  image had no NVIDIA driver at first boot"
+    }
+  },
+  "session_b": {
+    "alert_latency_s": {
+      "value": 32,
+      "on_screen": "Simulated GPU fault to on-call alert: 32 s",
+      "source": "docs/artifacts/session-b-load-timeline.txt, docs/artifacts/session-b-alertmanager.txt",
+      "evidence": "xid_injected=2026-09-24T13:49:58Z xid=79 simulated=true / GPUXidCritical state=active since=2026-09-24T13:50:30.389Z severity=critical",
+      "must_label": "simulated"
+    }
+  },
+  "session_c": {
+    "cordon_s": {
+      "value": 0.12,
+      "on_screen": "Cordoned in 0.12 s",
+      "source": "docs/artifacts/session-c-xid79.txt",
+      "evidence": "xid_injected=2026-09-28T20:32:46.293Z / gpu-fleet.io/cordoned-at=2026-09-28T20:32:46.409Z",
+      "must_label": "injected fault"
+    },
+    "drain_s": {
+      "value": 2.5,
+      "on_screen": "Drained in 2.5 s",
+      "source": "docs/artifacts/session-c-xid79.txt",
+      "evidence": "gpu-fleet.io/drained-at=2026-09-28T20:32:48.759Z"
+    }
+  },
+  "session_d": {
+    "slices": {
+      "value": 4,
+      "on_screen": "One commit: 1 GPU becomes 4",
+      "source": "docs/artifacts/session-d-tenancy.txt",
+      "evidence": "nvidia.com/gpu capacity=4 allocatable=4 / nvidia.com/gpu.sharing-strategy=time-slicing"
+    },
+    "slicing_s": {
+      "value": 88,
+      "on_screen": "in 88 s",
+      "source": "docs/04-goodput-and-burn-in.md (timeline) and docs/artifacts/session-d-timeline.txt",
+      "evidence": "commit pushed 19:38:48, gpu_allocatable_4=2026-09-30T19:40:16Z"
+    },
+    "quota": {
+      "on_screen": "A team's third GPU pod: refused by its quota",
+      "source": "docs/artifacts/session-d-quota-refusal.txt",
+      "evidence": "pods \"share-a3\" is forbidden: exceeded quota: gpu"
+    },
+    "goodput": {
+      "value": 66.4,
+      "on_screen": "66.4% goodput through a GPU fault",
+      "source": "docs/artifacts/session-d-goodput.json",
+      "evidence": "\"goodput\": 0.6639, \"total_s\": 1383.0, \"useful_s\": 918.182, \"outage_s\": 360.927",
+      "must_label": "injected fault"
+    },
+    "goodput_breakdown_s": {
+      "useful": 918.2, "outage": 360.9, "redone": 58.7, "checkpoint": 32.4, "other": 11.1, "restore": 1.8,
+      "source": "docs/artifacts/session-d-goodput.json"
+    },
+    "lookback_share_of_outage": {
+      "value": 83,
+      "on_screen": "83% of the outage: one 5-minute safety rule",
+      "source": "docs/04-goodput-and-burn-in.md, 'Where the 1383 seconds went'",
+      "evidence": "299.4 s of lookback out of 360.9 s of outage"
+    },
+    "burn_in": {
+      "on_screen": "3 hours at full load: 65 °C flat, no throttling, no errors",
+      "source": "docs/artifacts/session-d-burn-in.txt",
+      "evidence": "GPU temperature C, mean / max: 64.69 / 65 / time under thermal violation: 0 s / all error counters 0",
+      "temperature_every_10_min_c": [44, 64, 64, 64, 64, 64, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65]
+    }
+  },
+  "links": {
+    "site": "https://yassineteimi.github.io/nvidia-gpu-fleet-poc/",
+    "repo": "https://github.com/yassineteimi/nvidia-gpu-fleet-poc"
+  }
+}

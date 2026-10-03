@@ -1,0 +1,4 @@
+captured_at=2026-09-24T14:03:57Z
+gpu_nodes_in_cluster=0
+max GPU utilisation over the last 6h: 100
+GPU utilisation samples over the last 6h: 193

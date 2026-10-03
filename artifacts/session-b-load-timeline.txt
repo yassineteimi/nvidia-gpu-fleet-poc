@@ -1,0 +1,3 @@
+load_started=2026-09-24T13:23:14Z duration_requested_s=1200
+load_killed=2026-09-24T13:43:09Z
+xid_injected=2026-09-24T13:49:58Z xid=79 simulated=true

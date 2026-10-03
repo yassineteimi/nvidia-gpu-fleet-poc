@@ -1,0 +1,30 @@
+Defaulted container "nvidia-dcgm-ctr" out of: nvidia-dcgm-ctr, toolkit-validation (init)
+Successfully ran diagnostic for group.
++---------------------------+------------------------------------------------+
+| Diagnostic                | Result                                         |
++===========================+================================================+
+|-----  Metadata  ----------+------------------------------------------------|
+| DCGM Version              | 4.6.0                                          |
+| Driver Version Detected   | 595.91.07                                      |
+| GPU Device IDs Detected   | 27b8                                           |
+|-----  Deployment  --------+------------------------------------------------|
+| software                  | Pass                                           |
+|                           | GPU0: Pass                                     |
++-----  Hardware  ----------+------------------------------------------------+
+| memory                    | Pass                                           |
+|                           | GPU0: Pass                                     |
+| diagnostic                | Pass                                           |
+|                           | GPU0: Pass                                     |
+| nvbandwidth               | Skip                                           |
+|                           | GPU0: Skip                                     |
++-----  Integration  -------+------------------------------------------------+
+| pcie                      | Pass                                           |
+|                           | GPU0: Pass                                     |
++-----  Stress  ------------+------------------------------------------------+
+| memory_bandwidth          | Pass                                           |
+|                           | GPU0: Pass                                     |
+| targeted_stress           | Pass                                           |
+|                           | GPU0: Pass                                     |
+| targeted_power            | Pass                                           |
+|                           | GPU0: Pass                                     |
++---------------------------+------------------------------------------------+

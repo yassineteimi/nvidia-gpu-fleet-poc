@@ -1,0 +1,10 @@
+NAME                                       READY   STATUS      RESTARTS      AGE   IP            NODE               NOMINATED NODE   READINESS GATES
+gpu-feature-discovery-mvd5b                1/1     Running     0             14m   10.244.1.9    gpu-fleet-gpu-01   <none>           <none>
+gpu-operator-6cd4764cbf-4t72b              1/1     Running     0             41h   10.244.0.14   gpu-fleet-cp-01    <none>           <none>
+nvidia-container-toolkit-daemonset-knqhl   1/1     Running     0             14m   10.244.1.4    gpu-fleet-gpu-01   <none>           <none>
+nvidia-cuda-validator-vfqd6                0/1     Completed   0             12m   10.244.1.8    gpu-fleet-gpu-01   <none>           <none>
+nvidia-dcgm-exporter-n2wmw                 1/1     Running     3 (11m ago)   14m   10.244.1.7    gpu-fleet-gpu-01   <none>           <none>
+nvidia-dcgm-qbvcv                          1/1     Running     0             14m   10.244.1.10   gpu-fleet-gpu-01   <none>           <none>
+nvidia-device-plugin-daemonset-b65gc       1/1     Running     0             14m   10.244.1.6    gpu-fleet-gpu-01   <none>           <none>
+nvidia-driver-daemonset-wml6j              1/1     Running     0             14m   10.244.1.3    gpu-fleet-gpu-01   <none>           <none>
+nvidia-operator-validator-jx89f            1/1     Running     0             14m   10.244.1.5    gpu-fleet-gpu-01   <none>           <none>

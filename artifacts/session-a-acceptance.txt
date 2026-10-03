@@ -1,0 +1,6 @@
+PASS  node advertises nvidia.com/gpu: 1
+PASS  node carries pci-10de.present=true
+PASS  cuda-vectoradd printed Test PASSED
+PASS  nvidia-smi sees the L4
+PASS  driver in use is 595.91.07, the version pinned in Git
+PASS  image had no NVIDIA driver at first boot (session-a-gpu-image-inventory.txt)

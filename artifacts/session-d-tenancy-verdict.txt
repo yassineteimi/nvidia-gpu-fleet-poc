@@ -1,0 +1,5 @@
+PASS  the node advertises 4 nvidia.com/gpu
+PASS  three GPU pods from two tenants are Running
+PASS  all three pods report the same GPU UUID
+PASS  the third tenant-a pod was refused: exceeded quota
+PASS  nvidia-smi shows at least 3 processes on the GPU

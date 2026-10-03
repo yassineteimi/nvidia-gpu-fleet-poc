@@ -1,0 +1,74 @@
+captured_at=2026-10-02T19:27:19Z node=gpu-fleet-gpu-01
+== 2. node
+ready=True kubelet=v1.36.4 os=Ubuntu 24.04.4 LTS - 2026-09-09 - df5effdf kernel=6.8.0-136-generic runtime=containerd://2.3.6
+== 3. enumeration and PCIe
+gpu.count=1 gpu.product=NVIDIA-L4-SHARED gpu.memory=23034
+index, name, uuid, serial, pci.bus_id, vbios_version, pcie.link.gen.current, pcie.link.gen.max, pcie.link.width.current, pcie.link.width.max
+0, NVIDIA L4, GPU-0b922695-4e76-7357-12a0-5fd53957d0be, 1794624015606, 00000000:01:00.0, 95.04.65.00.13, 1, 4, 16, 16
+== 4. Node Feature Discovery
+feature.node.kubernetes.io/pci-10de.present=true
+== 5. driver and toolkit
+pinned_driver=595.91.07 node_driver=595.91.07
+pinned_toolkit=v1.20.0 toolkit_image=nvcr.io/nvidia/k8s/container-toolkit:v1.20.0
+== 7. ECC and row remapping, from nvidia-smi
+
+==============NVSMI LOG==============
+
+Timestamp                                              : Fri Oct  2 19:27:20 2026
+Driver Version                                         : 595.91.07
+CUDA Version                                           : 13.2
+
+Attached GPUs                                          : 1
+GPU 00000000:01:00.0
+    ECC Mode
+        Current                                        : Enabled
+        Pending                                        : Enabled
+    ECC Errors
+        Volatile
+            SRAM Correctable                           : 0
+            SRAM Uncorrectable Parity                  : 0
+            SRAM Uncorrectable SEC-DED                 : 0
+            DRAM Correctable                           : 0
+            DRAM Uncorrectable                         : 0
+        Aggregate
+            SRAM Correctable                           : 0
+            SRAM Uncorrectable Parity                  : 0
+            SRAM Uncorrectable SEC-DED                 : 0
+            DRAM Correctable                           : 0
+            DRAM Uncorrectable                         : 0
+            SRAM Threshold Exceeded                    : No
+        Aggregate Uncorrectable SRAM Sources
+            SRAM L2                                    : 0
+            SRAM SM                                    : 0
+            SRAM Microcontroller                       : 0
+            SRAM PCIE                                  : 0
+            SRAM Other                                 : 0
+        Channel Repair Pending                         : No
+        TPC Repair Pending                             : No
+        Unrepairable Memory                            : N/A
+    Remapped Rows
+        Correctable Error                              : 0
+        Inactive Correctable Error                     : 0
+        Uncorrectable Error                            : 0
+        Inactive Uncorrectable Error                   : 0
+        Pending                                        : No
+        Remapping Failure Occurred                     : No
+        Bank Remap Availability Histogram
+            Max                                        : 96 bank(s)
+            High                                       : 0 bank(s)
+            Partial                                    : 0 bank(s)
+            Low                                        : 0 bank(s)
+            None                                       : 0 bank(s)
+
+== 7. ECC and row remapping, from the DCGM counters in Prometheus
+DCGM_FI_DEV_ECC_SBE_AGG_TOTAL=0
+DCGM_FI_DEV_ECC_DBE_AGG_TOTAL=0
+DCGM_FI_DEV_ECC_SBE_VOL_TOTAL=0
+DCGM_FI_DEV_ECC_DBE_VOL_TOTAL=0
+DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS=0
+DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS=0
+DCGM_FI_DEV_ROW_REMAP_FAILURE=0
+DCGM_FI_DEV_PCIE_REPLAY_COUNTER=0
+DCGM_FI_DEV_XID_ERRORS=no data
+== 11. telemetry
+dcgm_exporter_up=1

@@ -1,13 +1,14 @@
 # Session D: goodput, burn-in and tenancy
 
-!!! success "D2a done, 2026-09-30. D2b, the burn-in, is next"
+!!! success "Done, 2026-10-03"
     One commit took the L4 from 1 schedulable GPU to 4 in 88 seconds, three pods from
-    two tenants shared it, and the quota refused a third pod in the same tenant. Then a
+    two tenants shared it, and the quota refused a third pod in the same tenant. A
     training job lost its pod to an injected XID 79, waited out the gated return to
-    service, resumed from its step 200 checkpoint in Garage and finished: **66.4%
-    goodput** over 23 minutes, with 26% of the run lost to the outage. Criteria 1 to 4
-    pass, and the runbook is written. The burn-in is still to do, and the XID was injected; the
-    GPU never failed.
+    service, resumed from its step 200 checkpoint in Garage and finished at **66.4%
+    goodput**. Then a second L4 ran 3 hours of tensor load at 65 °C flat, with no
+    thermal throttling, no new errors and not one minute of missing telemetry, and
+    passed `dcgmi diag -r 3` before and after. All six criteria pass, with two
+    caveats on the burn-in that I spell out below. The XID was injected; no GPU failed.
 
 **Scope:** time slicing the L4 through the GPU Operator, with two tenant namespaces
 under ResourceQuota. A PyTorch training job that checkpoints to object storage, gets
@@ -49,8 +50,8 @@ sequenceDiagram
 | 2 | A third GPU pod in a tenant with 2 GPUs of quota is refused by the API server | **Pass.** `exceeded quota: gpu, requested: requests.nvidia.com/gpu=1, used: requests.nvidia.com/gpu=2, limited: requests.nvidia.com/gpu=2`, with one slice still free on the node | [`session-d-quota-refusal.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-quota-refusal.txt) |
 | 3 | A training job, interrupted by XID 79, resumes from its checkpoint and finishes, with total, useful and lost time measured from published inputs | **Pass.** 66.4% goodput: 918.2 s useful out of 1383 s. 194 steps redone, 360.9 s of outage | [`session-d-goodput.json`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput.json), [step logs](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/tree/main/docs/artifacts/session-d-goodput), [`session-d-goodput-job.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput-job.txt) |
 | 4 | Checkpoints live off the GPU node | **Pass.** The second pod read the step 200 checkpoint from Garage on the control plane, in another zone, in 1.76 s | Pod 2's `start` event in [`goodput-kjxgc.jsonl`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-goodput/goodput-kjxgc.jsonl) |
-| 5 | Burn-in: 3 hours of tensor load, a stability record, `dcgmi diag -r 3` before and after | Not run yet, D2b | |
-| 6 | The runbook, every check with a command, an expected result and a failure path | **Written**, with 11 of 13 checks backed by output from this cluster. Checks 6 and 8 fill in from D2b; their pass criteria are fixed in advance | [Runbook](runbook.md) |
+| 5 | Burn-in: 3 hours of tensor load, a stability record, `dcgmi diag -r 3` before and after | **Pass on all seven criteria fixed in advance.** 10687 s of steady state, 0 s thermal throttling, no new ECC, remap or XID, 0 minutes without telemetry. Level 3 passed before (345 s) and after (344 s), with `nvbandwidth` skipped both times. The "after" diagnostic ran 8 hours late; see [the burn-in](#the-burn-in) | [`session-d-burn-in.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-burn-in.txt), [`session-d-diag-before.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-diag-before.txt), [`session-d-diag-after.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-diag-after.txt), [`session-d-handover.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-handover.txt) |
+| 6 | The runbook, every check with a command, an expected result and a failure path | **Pass.** 13 checks; 11 ran here and link to their output, and the two that can't apply to one rented GPU (inventory, multi-GPU interconnect) say what I'd do instead | [Runbook](runbook.md) |
 
 ## Where the 1383 seconds went
 
@@ -211,6 +212,96 @@ The step log flush on exit, the bug the end to end test found in D1, earned its 
 on real hardware: the last periodic flush was at step 387, so steps 388 to 394 are in
 the log only because of it.
 
+## The burn-in
+
+D2b ran on a different L4. fr-par-2 still had none, so the node came up in fr-par-1
+again, and `make handover` recorded a UUID (`GPU-0b922695-...`) that isn't D2a's
+(`30b37b65-...`). Its history is different too: zero aggregate single-bit errors and
+zero remapped rows, where Session B's card arrived with just under 100 and one. That's
+the reason the runbook reads these counters at every handover instead of once.
+
+```mermaid
+gantt
+  title D2b on 2026-10-02 and 03, UTC
+  dateFormat YYYY-MM-DDTHH:mm
+  axisFormat %H:%M
+  todayMarker off
+  section Handover
+    make handover, all PASS          :done, 2026-10-02T19:27, 1m
+    dcgmi diag -r 3, 345 s, Pass     :done, 2026-10-02T19:28, 6m
+  section Load
+    burn-in, 3 h of tensor load      :active, 2026-10-02T19:35, 180m
+  section Idle
+    node up, nobody at the keyboard  :crit, 2026-10-02T22:35, 494m
+  section After
+    capture, diag -r 3, 344 s, Pass  :done, 2026-10-03T06:48, 7m
+```
+
+The criteria were written into the [runbook](runbook.md#8-burn-in-under-sustained-load)
+before the run. The capture measured over the Job's own start and completion, minus a
+minute at each end: 10687 seconds.
+
+| Criterion | Measured | Result |
+|---|---|---|
+| Thermal violation time | 0 s | Pass |
+| New double-bit ECC, uncorrectable remapped rows, remap failures | 0, 0, 0. Single-bit ECC and PCIe replays 0 too | Pass |
+| XIDs | None. node-problem-detector's `GPUUnhealthy` never went True, and DCGM never recorded one (see below) | Pass |
+| Minutes without a temperature sample | 0. 712 samples, one every 15 s, the full count | Pass |
+| GPU Operator container restarts | 0 | Pass |
+| Tensor activity held | Mean 95.0%, minimum 94.9%; GPU utilisation never below 98% | Pass |
+| `dcgmi diag -r 3` after the load | Pass, 344 s | Pass |
+
+Here is the GPU, one real sample every 10 minutes from
+[`session-d-burn-in-series.csv`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-burn-in-series.csv). Minute 0 is the
+idle GPU just before the load reached it.
+
+```mermaid
+%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#e06666"}}}}%%
+xychart-beta
+  title "GPU temperature, °C"
+  x-axis "minutes into the burn-in" [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180]
+  y-axis "°C" 30 --> 80
+  line [44, 64, 64, 64, 64, 64, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65, 65]
+```
+
+```mermaid
+%%{init: {"themeVariables": {"xyChart": {"plotColorPalette": "#76b900"}}}}%%
+xychart-beta
+  title "SM clock, MHz"
+  x-axis "minutes into the burn-in" [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180]
+  y-axis "MHz" 0 --> 1200
+  line [210, 885, 885, 885, 885, 885, 900, 900, 915, 885, 885, 885, 885, 885, 930, 915, 885, 885, 885]
+```
+
+Both lines are flat, and that's the result. The GPU reached 64 °C three minutes in and
+never went above 65 °C. Power sat at 72.0 W, the L4's limit, in every 10-minute
+interval, and DCGM counted 10650 seconds of power capping: 99.7% of the window. The SM
+clock is what the power cap leaves: 870 to 945 MHz, 891 MHz on average in the first
+hour and 889 in the last. A cooling problem would have shown up as the temperature
+creeping and the clock falling with it, hours in. Neither happened.
+
+**Two caveats.** The first is mine to own: the Job finished at 22:35, I wasn't at the
+keyboard, and the node sat idle and billed until 06:48. That's about EUR 6.50 spent
+on nothing, and it also means the "after" diagnostic ran on a GPU that had been
+cooling for 8 hours, not straight off the load. It still shows the 3 hours did no
+lasting damage, which is what the criterion asks; it doesn't show how the card behaves
+the moment the load stops. The second is the diagnostic's `nvbandwidth` plugin, which
+reported Skip both times. The exit status was 0 and every other plugin passed, so I
+count level 3 as passed, but I'm not claiming nvbandwidth ran. My guess is that it
+needs more than one GPU, and I haven't confirmed that.
+
+**Why there was no XID series.** The capture's XID query returned no data at all,
+which looked like missing telemetry until I read dcgm-exporter's source. At
+4.6.0-4.8.3 it drops any value DCGM marks as blank (`gpu_collector.go`, `toString`),
+and DCGM keeps the XID field blank until the GPU records an XID. A GPU with a clean
+history has no XID series. Session B had one only because I'd injected XID 79 into
+DCGM before that capture ran. So the burn-in's XID check now reads two sources:
+the DCGM field, where "no data" means "no XID", and node-problem-detector's condition
+from the kernel log, which existed and read 0 for the whole window.
+
+This is three hours on one card, not the multi-day, rack-wide campaign it stands in
+for.
+
 ## What I changed because of the session
 
 | Change | Reason |
@@ -219,6 +310,10 @@ the log only because of it.
 | `goodput.sh start` checks the trainer is Running before saying so | It announced "training" over a crashed pod |
 | A `gpu_zone` variable puts the GPU node in another zone of the region | fr-par-2 had no L4; moving the whole cluster would have rebuilt the control plane |
 | `make down` asks the Scaleway API what's left in the GPU zone | A failed boot in fr-par-1 left a 150 GB volume billing where Terraform couldn't see it ([Findings](findings.md)) |
+| The burn-in capture reports violation time in seconds, not microseconds | The counters are nanoseconds; the first capture labelled 99.7% of the window as 10.6 trillion µs. The capture was re-run against the same Prometheus data; the first version is kept as [`session-d-burn-in-first-capture.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-burn-in-first-capture.txt) |
+| The XID check also reads node-problem-detector's condition | A clean GPU has no DCGM XID series at all |
+| Clock events come from `DCGM_EXP_CLOCK_EVENTS_TOTAL` | The raw clock-reasons field I queried isn't exported, so that section of the first capture was empty. The new one shows no clock event starting inside the window, which fits a power cap that started in the first minute and never let go |
+| Not done yet: the burn-in should end the session itself, or wake someone | 8 hours of idle GPU after the Job finished |
 
 ---
 
@@ -232,7 +327,7 @@ Two billed sittings, so nothing depends on me staying at the keyboard for five h
 |---|---|---|---|
 | D1, authoring | Object store, tenants and quotas, the time slicing change (not merged), the training job and its goodput analysis with tests, burn-in and capture scripts. Deployed to the control plane where it can be, and checked there for free | 30 to 45 min, done | none |
 | D2a, live | GPU up, pre-pull the PyTorch image, merge the time slicing commit, tenants and quotas, then the interrupted training run, GPU down | about 1.5 h, done | about 1.5 h |
-| D2b, live | GPU up, `dcgmi diag -r 3`, 3 hour burn-in, `dcgmi diag -r 3` again, capture, GPU down | about 15 min, plus checking in | about 3.5 h |
+| D2b, live | GPU up, `dcgmi diag -r 3`, 3 hour burn-in, `dcgmi diag -r 3` again, capture, GPU down | about 15 min, plus checking in, done | about 3.5 h planned, about 12 h billed: see [the burn-in](#the-burn-in) |
 | D3, write-up | This page and the runbook from the artifacts | about 30 min | none |
 
 About 5 GPU hours in total, roughly EUR 4 at EUR 0.79/h.
@@ -299,14 +394,15 @@ D2b, about 3.5 hours of GPU time:
    captured as text this time), `make burn-in-diag LABEL=before`, `make burn-in`.
 2. Three hours later, `make burn-in-capture`, `make burn-in-diag LABEL=after`, `make down`.
 
-### What D2a answered, and what's still open
+### What D2 answered, and what's still open
 
-| Question before D2a | Answer |
+| Question before D2 | Answer |
 |---|---|
 | How long does the 4.3 GB PyTorch image take to pull? | 3 min 23 s for 4.28 GB, so pre-pulling was worth it |
 | How fast is a training step? | 0.306 s median, 0.317 s at the 99th percentile, against my estimate of 0.2 s. 3000 steps took about 15 minutes |
 | How long from the commit to 4 GPUs? | 88 s, ArgoCD's poll included |
 
+| How long does `dcgmi diag -r 3` take on an L4? | 345 s, then 344 s. Level 2 took 6 s |
+
 Still open: what a running GPU pod sees when the device plugin restarts with a new
-config (I started the tenants after the switch), and how long `dcgmi diag -r 3` takes
-on an L4, which D2b measures.
+config (I started the tenants after the switch), and why `nvbandwidth` skips.

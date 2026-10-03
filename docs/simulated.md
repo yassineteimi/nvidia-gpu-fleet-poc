@@ -1,14 +1,14 @@
 # What is simulated
 
 If something in this project didn't come from real hardware doing a real thing, it's
-on this page. The burn-in row describes the plan, because D2b hasn't run yet.
+on this page.
 
 | Item | Real | Simulated | Why |
 |---|---|---|---|
 | XID seen by DCGM (Session B, done) | The DCGM exporter, the counter it derives, the Prometheus rule, and Alertmanager receiving a critical alert | The XID. `scripts/inject-xid-dcgm.sh` wrote the value 79 into DCGM's field cache with `dcgmi test --inject`. Nothing happened on the GPU or in the kernel log | It tests the path from DCGM to an alert without a real fault. Session C injects into the kernel log instead, because that's what its detection reads |
 | GPU hardware fault (Session C, done) | node-problem-detector, the node condition, the cordon, the drain through the Eviction API, the Events, and the gate back into service with a real `dcgmi diag` | The XID. `scripts/inject-xid.sh` wrote `NVRM: Xid` lines in the driver's exact format into the node's kernel log, with SIMULATED in the message. The driver, NVML and the device plugin never saw them, so the GPU stayed allocatable | I can't make a rented L4 fail on demand, and damaging rented hardware on purpose isn't an option |
 | Fleet scale | Every operation is the one a fleet operator runs, on one node | One node stands in for a fleet: no cross-node scheduling pressure, no correlated failures | Cost. One L4 at EUR 0.79/h fits a 5 hour weekly budget; a rack doesn't |
-| Burn-in duration (Session D, planned) | The load, the telemetry, the thresholds and the stability record | The duration: hours, not days | A real acceptance campaign runs for days across racks. See [Session D](04-goodput-and-burn-in.md) |
+| Burn-in duration (Session D, done) | The load, the telemetry, the criteria fixed in advance, the stability record and `dcgmi diag -r 3` before and after, on a real L4 | The duration: hours, not days | A real acceptance campaign runs for days across racks. See [Session D](04-goodput-and-burn-in.md) |
 | Multi-tenancy (Session D, done) | Two namespaces, real ResourceQuota enforcement, real time-sliced GPU sharing: three processes on one L4 and a pod refused by the API server | The tenants aren't real teams and the workloads are synthetic | It shows the mechanism, not the organisation |
 | Training job and its interruption (Session D, done) | PyTorch on the L4, checkpoints in Garage, the eviction by gpu-remediator, the wait for return to service and the resume | The data is random tensors, and the model is an 8 layer MLP sized to keep the GPU busy. The interruption is Session C's simulated XID 79: the process is evicted with SIGTERM while its GPU still works. It deliberately writes no checkpoint on SIGTERM, since a process whose GPU fell off the bus couldn't | The goodput figure is about the lost time around a fault, not about the model. Downloading a dataset onto a node billed by the hour buys nothing here |
 | Hardware handover | The acceptance runbook and its checks | There's no physical handover. The "handover" is a Terraform apply | No bare metal at this budget |

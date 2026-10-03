@@ -40,6 +40,24 @@ replays two quick restarts on a new pod: it passes with `changes()` and fails wi
 `increase()`. For any small integer threshold, treat `increase()` as a rate estimate,
 not a count.
 
+### A GPU with no XIDs has no XID metric at all
+
+The burn-in's XID query came back with no data, not a zero, which looked like broken
+telemetry on a GPU that was otherwise reporting everything. It isn't. DCGM keeps the
+XID field blank until the GPU records an XID, and dcgm-exporter at 4.6.0-4.8.3 drops
+any blank value before it becomes a sample (`internal/pkg/collector/gpu_collector.go`,
+`toString`, which checks `isInt64Blank`). Session B had a series only because I'd
+injected XID 79 into DCGM before that capture ran. The `GPUXidCritical` alert is fine
+with this, since it fires on a value that exists. A check that wants "no XID" has to
+treat no data as zero, and it's safer to pair it with a source that always exists:
+the burn-in capture now also reads node-problem-detector's `GPUUnhealthy` condition
+through kube-state-metrics.
+
+The same capture taught me to read units off the counter file, not my memory:
+`DCGM_FI_DEV_POWER_VIOLATION` and `DCGM_FI_DEV_THERMAL_VIOLATION` count nanoseconds.
+My first capture labelled them microseconds and reported 99.7% of three hours as
+10.6 trillion µs.
+
 ### The exporter restarts at startup because of standalone DCGM
 
 Session A saw three restarts and I could only guess why. In Session B I captured the

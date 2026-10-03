@@ -1,11 +1,10 @@
 # Cluster acceptance runbook
 
-!!! info "Status: written from Sessions A to D2a, two checks wait for D2b"
-    Eleven of the thirteen checks below ran on this cluster, and each one links to
-    the output it produced. Checks 6 and 8, `dcgmi diag -r 3` and the burn-in, run in
-    D2b; their pass criteria are written down here first so the result can't shape
-    them. Check 9 doesn't apply to one GPU, and check 1 doesn't apply to rented
-    hardware. Both say what I'd do instead.
+!!! success "Every applicable check ran on this cluster"
+    Eleven of the thirteen checks below ran on real L4s between Sessions A and D, and
+    each one links to the output it produced. The burn-in's pass criteria were written
+    here before the burn-in ran. Check 9 doesn't apply to one GPU, and check 1 doesn't
+    apply to rented hardware; both say what I'd do instead.
 
 This takes a GPU node from "the provider says it's yours" to "it runs production
 work". Work top to bottom. A failure high on the list makes everything below it
@@ -69,9 +68,9 @@ The node is accepted when all of these hold.
 |---|---|---|---|
 | 1 | Every GPU the order says exists is present and enumerated | 3 | Ran, Session A |
 | 2 | Driver and container toolkit versions match the ones pinned in Git | 5 | Ran, Session A |
-| 3 | No uncorrectable ECC errors, no uncorrectable remapped rows, no remapping pending or failed | 7 | Partly: the counters ran in Session B, as screenshots. `make handover` captures them as text in D2b |
-| 4 | Every GPU passes `dcgmi diag -r 3`, before and after the burn-in | 6 | D2b. Level 2 ran twice and passed in 6 s each time |
-| 5 | 3 hours of sustained load with no thermal throttling, no new errors and no telemetry gaps | 8 | D2b |
+| 3 | No uncorrectable ECC errors, no uncorrectable remapped rows, no remapping pending or failed | 7 | Ran, Session D: all zero, captured as text by `make handover` |
+| 4 | Every GPU passes `dcgmi diag -r 3`, before and after the burn-in | 6 | Ran, Session D: Pass in 345 s and 344 s, `nvbandwidth` skipped |
+| 5 | 3 hours of sustained load with no thermal throttling, no new errors and no telemetry gaps | 8 | Ran, Session D: all seven criteria met |
 | 6 | The scheduler admits and runs a real GPU workload, and enforces quotas | 10 | Ran, Sessions A and D |
 | 7 | Telemetry reaches Prometheus for every GPU | 11 | Ran, Session B |
 | 8 | An alert fires end to end, on purpose | 12 | Ran, Session B |
@@ -161,10 +160,14 @@ adds the stress plugins to level 2's software, memory and PCIe checks.
 **Expect:** every plugin `Pass`, exit status 0. **Pass criterion, written before D2b:**
 level 3 passes before the burn-in and again after it, on the same GPU.
 
-**Here so far:** level 2 passed twice on the L4, in 6 seconds each time
-([`session-c-dcgmi-diag.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-c-dcgmi-diag.txt),
-[`session-d-dcgmi-diag.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-dcgmi-diag.txt)).
-Level 3 runs in D2b.
+**Seen here:** level 3 passed on the D2b L4 in 345 seconds before the burn-in and
+344 seconds after it: software, memory, the diagnostic plugin, PCIe and all three
+stress plugins (memory bandwidth, targeted stress, targeted power)
+([`session-d-diag-before.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-diag-before.txt),
+[`session-d-diag-after.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-diag-after.txt)). The `nvbandwidth` plugin
+reported Skip both times, with exit status 0. I count a skip as "didn't run", not as a
+pass, and haven't confirmed why it skipped on a single GPU. Level 2, for comparison,
+takes 6 seconds, which is why the return to service in check 13 uses it.
 
 **If not:** run it once more to rule out a busy GPU (the script refuses to start the
 `after` run while the burn-in still holds the GPU). A second failure on the same
@@ -182,7 +185,10 @@ Correctable history is recorded, not failed on. Session B's dashboard showed thi
 arriving with one correctable remapped row and just under 100 aggregate single-bit
 errors, with no uncorrectable rows and no failures: a healthy GPU that isn't new. I
 read those off a screenshot, which is the reason `make handover` now captures them as
-text.
+text. The L4 it captured in Session D was a different card, with no history at all:
+zero single-bit errors, zero remapped rows, nothing pending, all 96 banks with
+remapping available
+([`session-d-handover.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-handover.txt)).
 
 **If not:** a pending remap clears with a GPU reset, after which the check runs again.
 A remap failure, uncorrectable remapped rows or double-bit errors at handover go back
@@ -224,6 +230,19 @@ that's a provider ticket. New uncorrectable errors or any XID during the burn-in
 the GPU goes back, whatever the diagnostic says afterwards. A telemetry gap fails the
 run rather than the GPU: the burn-in proved nothing for the minutes nobody watched, so
 it runs again.
+
+**Seen here:** all seven passed over 10687 seconds of steady state on an L4: 0 s of
+thermal throttling, no new errors, 0 minutes without a sample, 0 restarts, tensor
+activity never below 94.9%, and level 3 again afterwards. The card sat at 65 °C and
+72 W, power capped 99.7% of the time
+([`session-d-burn-in.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-d-burn-in.txt),
+[Session D](04-goodput-and-burn-in.md#the-burn-in)).
+
+Two things to know before reading the XID line of a capture. DCGM keeps the XID field
+blank until the GPU records one, and dcgm-exporter drops blank values, so a clean GPU
+has no XID series and the query says "no data". The capture therefore also reads
+node-problem-detector's `GPUUnhealthy` condition, which exists either way. And the
+violation counters are in nanoseconds.
 
 This is a scaled-down version of a real campaign, which runs for days across racks
 and measures the whole system, not one card.

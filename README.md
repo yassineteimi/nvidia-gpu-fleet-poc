@@ -64,7 +64,7 @@ on the [architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/a
 | A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
 | B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat I explain in the write-up, 2026-09-24 |
 | C | node-problem-detector, remediation controller, fault injection | **Done.** XID 79 cordoned the L4 node in 0.12 s and drained it in 2.5 s; five of six criteria passed outright, 2026-09-28 |
-| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | **D2a done.** One commit took the L4 to 4 time-sliced GPUs, quotas refused the extra pod, and an interrupted training run measured 66.4% goodput, 2026-09-30. Burn-in next |
+| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | **Done.** 4 time-sliced GPUs from one commit, quotas enforced, 66.4% goodput through an injected XID 79, and a 3 hour burn-in at 65 °C with no throttling or errors, 2026-10-03 |
 
 ## What it covers
 
@@ -74,7 +74,7 @@ on the [architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/a
 | **GPU health telemetry** | DCGM exporter with a custom counter set (utilisation, SM and tensor activity, framebuffer, temperature, power, ECC, row remapping, clock event reasons, XID) and Prometheus alert rules, each with a unit test | B |
 | **Fault detection and remediation** | node-problem-detector reads `NVRM: Xid` from the kernel log into a node condition. A Python controller cordons, records an event, annotates and drains. A node only returns to service after `dcgmi diag` passes | C |
 | **Tenancy and goodput** | Time slicing from a commit, two tenant namespaces with GPU quotas, and a PyTorch job that checkpoints to Garage, loses its GPU to an injected XID 79 and resumes, with every second of the run accounted for | D |
-| **Acceptance** | A 3 hour burn-in record and an acceptance runbook with exit criteria | D, next |
+| **Acceptance** | A 3 hour burn-in with criteria fixed before it ran, `dcgmi diag -r 3` before and after, and a 13 check acceptance runbook backed by this cluster's output | D |
 
 ## Repository layout
 

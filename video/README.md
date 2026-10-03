@@ -1,7 +1,9 @@
 # The PoC as a 60 second video
 
-A brief for building a short motion-design video about this project, for hiring
-managers and a LinkedIn audience. Nothing here is built yet.
+A short motion-design video about this project, for hiring managers and a LinkedIn
+audience. Built and rendered: [`dist/gpu-fleet-poc-60s.mp4`](dist/gpu-fleet-poc-60s.mp4)
+(1080 x 1080, 30 fps, 60 s, H.264) and the poster frame
+[`dist/poster.png`](dist/poster.png).
 
 **Decided:** made in code with [Remotion](https://www.remotion.dev/) (React), rendered
 to MP4 locally; square 1080 x 1080 at 30 fps, about 60 seconds; captions on screen,
@@ -18,14 +20,28 @@ music optional, no voiceover.
   "injected"; the site is careful about that and the video must be too.
 - Captions short, in plain English, written for someone who doesn't run GPU clusters.
   No buzzwords, no exclamation marks.
-- Render locally: Chromium is at `/opt/pw-browsers/chromium` in Claude's cloud
-  containers, and Remotion can use it through `--browser-executable`. Fonts bundled in
-  the project, nothing loaded from the network at render time.
-- Output `video/out/gpu-fleet-poc-60s.mp4`, plus a poster frame
-  `video/out/poster.png` for the LinkedIn post. Keep `out/` out of Git if the file is
-  large; attach it to a GitHub release instead.
+- Render locally, with fonts bundled in the project and nothing loaded from the network
+  at render time.
+- The finished files go in `dist/`; `out/` holds build output and stays out of Git.
 
-## Prompt for the next session
+## Rebuilding it
+
+```sh
+cd video
+npm ci
+npm run render     # writes out/gpu-fleet-poc-60s.mp4
+npm run poster     # writes out/poster.png
+npm run finalize   # re-encodes to yuv420p with faststart into dist/, needs ffmpeg on the PATH
+```
+
+Each scene is one component in `src/scenes/`, timed in `src/Video.tsx`. Remotion
+needs a Chrome headless shell, not a full Chromium: in Claude's cloud containers that's
+`/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`, which the
+scripts point at. Elsewhere, drop `--browser-executable` and Remotion downloads its own.
+The render writes `yuvj420p`; `finalize` converts to `yuv420p`, which every player and
+LinkedIn accept.
+
+## The prompt this was built from
 
 > Read `video/README.md`, `video/storyboard.md` and `video/facts.json` in this
 > repository, and skim `docs/use-cases.md` and `docs/04-goodput-and-burn-in.md` for

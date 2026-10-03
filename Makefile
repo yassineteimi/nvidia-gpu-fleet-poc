@@ -123,7 +123,7 @@ docs:          ## Build the documentation site strictly
 
 lint:          ## Fail if an em dash has crept into the repository
 	@dash=$$(printf '\xe2\x80\x94'); \
-	if grep -rn "$$dash" --exclude-dir=.git --exclude-dir=.venv --exclude-dir=site .; then \
+	if grep -rn "$$dash" --exclude-dir=.git --exclude-dir=.venv --exclude-dir=site --exclude-dir=node_modules --exclude-dir=out -I .; then \
 	  echo "em dash found, see above"; exit 1; \
 	fi
 	@echo "no em dashes"

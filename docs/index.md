@@ -1,55 +1,45 @@
 # GPU fleet operations on upstream Kubernetes
 
-I take a rented NVIDIA L4 from a bare cloud instance to a GPU node that ArgoCD
-manages, Prometheus monitors and a controller remediates. Then I
-destroy it and rebuild it from Git. All of it ran on real hardware. The terminal
-output on these pages was captured during the sessions and links back to files in
-`docs/artifacts/`.
+A GPU cloud sells GPUs, but what customers really pay for is GPUs that stay up through
+a training run. This project shows the operations behind that, on one NVIDIA L4 I
+rented by the hour: a driver installed from Git, health telemetry worth paging on, a
+broken GPU pulled out of service automatically, and the cost of a failure measured to
+the second.
 
-## What I'm building towards
+New to GPU infrastructure? Start with [the use cases](use-cases.md), which explain
+each piece without assuming you run clusters.
 
-- Driver and container toolkit lifecycle driven from Git, not from a shell on the node.
-- GPU telemetry an operator would actually page on: XID, ECC, row remapping and clock
-  event reasons, not only utilisation.
-- Automatic cordon and drain when a GPU goes bad, and a gated way back into service.
-- A measured goodput figure for a training job that gets interrupted, plus an
-  acceptance runbook with exit criteria.
+## Results
 
-All four sessions are done, and on 2026-10-03 I destroyed the cluster, so nothing on
-these pages is a live system: every result links to output committed during a session.
-The table below is the only place I claim progress.
+| Use case | What happened on the L4 |
+|---|---|
+| [Bring GPUs online the same way every time](01-platform.md) | The GPU Operator installed driver `595.91.07`, pinned in Git, on a node that booted with no driver |
+| [See a failing GPU before the customer does](02-observability.md) | A simulated XID 79 reached Alertmanager as a critical alert in 32 s, and a real power-throttling alert fired under load |
+| [Take a broken GPU out of service on its own](03-fault-remediation.md) | An injected XID 79 cordoned the node in 0.12 s and drained it in 2.5 s |
+| [Share one GPU between teams](04-goodput-and-burn-in.md#from-a-commit-to-four-gpus) | One commit turned the L4 into 4 slices in 88 s, and a team's quota refused its third pod |
+| [Measure a training run's goodput](04-goodput-and-burn-in.md#where-the-1383-seconds-went) | A job lost its GPU and resumed from a checkpoint: 66.4% of its time was useful, and most of the loss was one 5 minute rule |
+| [Accept new hardware](04-goodput-and-burn-in.md#the-burn-in) | 3 hours at full load, 65 °C flat, no throttling and no errors; diagnostics passed before and after |
 
-## Build status
+All four sessions ran between 24 September and 3 October 2026. The cluster is
+destroyed now, so nothing here is a live system: every result links to output
+committed during a session.
 
-| Session | Scope | Status |
-|---|---|---|
-| A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
-| B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat, 2026-09-24 |
-| C | node-problem-detector, remediation controller, fault injection | **Done.** Five of six criteria passed outright, one on two of its three paths, 2026-09-28 |
-| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | **Done.** 4 time-sliced GPUs from one commit, quotas enforced, 66.4% goodput through an injected XID 79, and a clean 3 hour burn-in, 2026-10-03. See [Session D](04-goodput-and-burn-in.md) |
+## Worth reading
 
-## Worth reading first
+- [Findings](findings.md): what didn't match the documentation or my assumptions,
+  such as a Prometheus function that misses the first GPU error on a node.
+- [What is simulated](simulated.md): the full list. A PoC is only as credible as what
+  it admits.
+- [The runbook](runbook.md): how I'd accept a GPU node, step by step, with the output
+  from this cluster behind each check.
 
-- [Session D](04-goodput-and-burn-in.md): a training job loses its GPU mid-run and
-  resumes from a checkpoint on the control plane, and I account for all 1383 seconds
-  of it. 26% went to the outage, and most of that to one 5 minute rule.
-- [Session C](03-fault-remediation.md): an injected XID 79 cordons the L4 node in 0.12
-  seconds and drains it in 2.5, and the design changed twice because of what
-  node-problem-detector's source says.
-- [Session B](02-observability.md): a real power-throttling alert on the L4, a
-  simulated XID 79 traced from DCGM to Alertmanager in 32 seconds, and a load job
-  that didn't quite get killed.
-- [Findings](findings.md): what didn't match the documentation or my assumptions.
-  Two examples: `increase()` misses the first XID on a node, and it also over-counts
-  pod restarts.
-- [What is simulated](simulated.md): the full list, because a PoC is only as credible
-  as what it admits.
+## Scope
 
-## Reproducing it
-
-Clone the repo, add Scaleway credentials, and `make up` does the rest: it creates the
-GPU node, joins it, lets the GPU Operator install the driver and runs a CUDA workload,
-without anyone logging into the node.
+One GPU on one node isn't a fleet, and I don't pretend otherwise. The method is what
+carries over: nobody installs the driver by hand, the alerts are the ones an operator
+pages on, a controller does the remediation, and acceptance has written exit criteria.
+A real acceptance campaign runs for days across racks and measures bandwidth between
+nodes; this ran for hours on one node, and each page says where that matters.
 
 ```{ .sh .terminal }
 $ git clone https://github.com/yassineteimi/nvidia-gpu-fleet-poc
@@ -57,20 +47,3 @@ $ cd nvidia-gpu-fleet-poc && cp .env.example .env    # fill in Scaleway keys
 $ make cluster && make argocd                        # once
 $ make up                                            # every session
 ```
-
-## Stack
-
-Upstream Kubernetes through kubeadm, no vendor distribution. A Scaleway L4-1-24G GPU
-node and a small control plane that stayed up between sessions, both created by
-Terraform. ArgoCD app-of-apps from the first commit, the NVIDIA GPU Operator with Node
-Feature Discovery, the DCGM exporter and kube-prometheus-stack. Sessions C and D add
-node-problem-detector with a GPU monitor, a remediation controller in Python on the
-Kubernetes client, and a PyTorch training job with checkpointing.
-
-## Scope
-
-One GPU on one node isn't a fleet, and I don't pretend otherwise. The method is what
-carries over: nobody installs the driver by hand, the alerts are the ones an operator
-pages on, a controller does the remediation, and acceptance has written exit criteria.
-A real acceptance campaign runs for days across racks and measures NCCL bandwidth
-between nodes; this runs for hours on one node, and each page says where that matters.

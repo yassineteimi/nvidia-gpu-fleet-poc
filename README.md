@@ -1,7 +1,7 @@
 <h1 align="center">NVIDIA GPU Fleet PoC: Day 2 operations on upstream Kubernetes</h1>
 
 <p align="center">
-  <b>Driver lifecycle · GPU health telemetry · Fault remediation · Goodput</b> on a rented NVIDIA L4, run from Git<br/>
+  <b>Bring GPUs online · watch them · pull the broken ones · measure what failures cost</b><br/>on a rented NVIDIA L4, run from Git<br/>
   kubeadm · ArgoCD app-of-apps · GPU Operator · DCGM · Prometheus
 </p>
 
@@ -11,24 +11,61 @@
 
 ---
 
-I rent an NVIDIA L4 on Scaleway by the hour, join it to a kubeadm cluster, and run it
-the way a fleet operator would: every component comes from this repository through
-ArgoCD, and nobody touches the node by hand. The NVIDIA driver and container toolkit
-are pinned in a values file, so upgrading the driver is a commit. When a session ends I
-destroy the GPU node, and the next session rebuilds it from Git.
+Training a large model keeps thousands of GPUs busy on one job, and when one of them
+fails the job stops. Meta's [Llama 3 paper](https://arxiv.org/abs/2407.21783) counted
+419 unexpected interruptions in 54 days on 16,384 H100s, most of them hardware. Running
+those GPUs well (bringing them online, watching them, pulling the broken ones and
+measuring what failures cost) is the job behind every GPU cloud.
 
-It's one GPU and a small control plane, so it's a fleet method at small scale, not a
-fleet. I've kept a page listing
-[everything that's simulated](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/simulated/).
-The main item: the GPU never actually failed. In Session B I injected an XID into DCGM
-to test alerting, and in Session C I wrote them into the node's kernel log to test
-detection and remediation.
+I rebuilt that job on a small scale. One NVIDIA L4, rented by the hour on Scaleway,
+joined to a Kubernetes cluster I built with kubeadm and run entirely from this
+repository through ArgoCD: nobody installs anything on the GPU node by hand, and a
+driver upgrade is a commit.
 
-> **The cluster is switched off.** I destroyed both nodes and the network on 2026-10-03,
-> after Session D, so nothing is billing. Every result on these pages comes from output
-> committed to `docs/artifacts/`, not from a live system. `make cluster && make argocd`
-> rebuilds the control plane from this repository in about 30 minutes, and `make up`
-> adds the GPU node.
+## Six use cases, one GPU
+
+```mermaid
+flowchart LR
+  accept["<b>Accept</b><br/>diagnostics,<br/>burn-in"]
+  online["<b>Bring online</b><br/>driver from Git"]
+  run["<b>Share and run</b><br/>teams, quotas,<br/>training jobs"]
+  watch["<b>Watch</b><br/>XID, ECC, heat"]
+  isolate["<b>Isolate and<br/>diagnose</b><br/>cordon, drain"]
+  rma(["<b>Return</b><br/>to the vendor"])
+
+  accept --> online --> run <--> watch
+  watch -->|"fault"| isolate
+  isolate -.->|"passes"| online
+  isolate -->|"fails"| rma
+
+  classDef a fill:#76b900,stroke:#4a7300,color:#000
+  classDef b fill:#6fa8dc,stroke:#3d6e9e,color:#000
+  classDef c fill:#f6b26b,stroke:#b07020,color:#000
+  classDef d fill:#b4a7d6,stroke:#674ea7,color:#000
+  class online a
+  class watch b
+  class isolate c
+  class accept,run d
+```
+
+Green is Session A, blue Session B, orange Session C, purple Session D. Each one is
+[explained for non-specialists here](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/use-cases/).
+
+| Use case | What happened on the L4 | Session |
+| --- | --- | --- |
+| Bring GPUs online the same way every time | The GPU Operator installed driver `595.91.07`, pinned in Git, on a node that booted with no driver | [A](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/01-platform/) |
+| See a failing GPU before the customer does | A simulated XID 79 reached Alertmanager as a critical alert in 32 s; a real power-throttling alert fired under load | [B](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/02-observability/) |
+| Take a broken GPU out of service on its own | An injected XID 79 cordoned the node in 0.12 s and drained it in 2.5 s; it only came back after `dcgmi diag` passed | [C](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/03-fault-remediation/) |
+| Share one GPU between teams, fairly | One commit turned the L4 into 4 slices in 88 s; a team's quota refused its third pod | [D](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/04-goodput-and-burn-in/) |
+| Know how much of a training run was useful | A PyTorch job lost its GPU, resumed from a checkpoint and finished at 66.4% goodput | [D](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/04-goodput-and-burn-in/) |
+| Accept new hardware before it takes real work | 3 hours at full load: 65 °C flat, no throttling, no errors, diagnostics passed before and after | [D](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/04-goodput-and-burn-in/) |
+
+All four sessions ran on real L4s between 24 September and 3 October 2026. The GPU
+faults were injected, since a rented GPU doesn't fail on demand, and
+[this page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/simulated/) lists
+everything that was simulated. The cluster is switched off now; every result links to
+output committed during a session, and `make cluster && make argocd && make up`
+rebuilds it.
 
 ## Architecture
 
@@ -60,27 +97,8 @@ flowchart LR
   class gpu nv
 ```
 
-Every component on both nodes, the network, and the order ArgoCD deploys things in are
-on the [architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/architecture/).
-
-## Build status
-
-| Session | Scope | Status |
-| --- | --- | --- |
-| A | Terraform nodes, kubeadm, ArgoCD, NFD, GPU Operator, CUDA acceptance | **Done.** Acceptance passed on a real L4, 2026-09-24 |
-| B | DCGM telemetry, Grafana dashboard, XID and utilisation alerting | **Done.** All five criteria met on a real L4, one with a caveat I explain in the write-up, 2026-09-24 |
-| C | node-problem-detector, remediation controller, fault injection | **Done.** XID 79 cordoned the L4 node in 0.12 s and drained it in 2.5 s; five of six criteria passed outright, 2026-09-28 |
-| D | Time slicing and tenancy, goodput, burn-in, acceptance runbook | **Done.** 4 time-sliced GPUs from one commit, quotas enforced, 66.4% goodput through an injected XID 79, and a 3 hour burn-in at 65 °C with no throttling or errors, 2026-10-03 |
-
-## What it covers
-
-| Capability | What it does | Session |
-| --- | --- | --- |
-| **Driver and toolkit lifecycle** | NVIDIA GPU Operator with Node Feature Discovery. Versions pinned in Git; a driver upgrade is a commit that ArgoCD rolls out | A |
-| **GPU health telemetry** | DCGM exporter with a custom counter set (utilisation, SM and tensor activity, framebuffer, temperature, power, ECC, row remapping, clock event reasons, XID) and Prometheus alert rules, each with a unit test | B |
-| **Fault detection and remediation** | node-problem-detector reads `NVRM: Xid` from the kernel log into a node condition. A Python controller cordons, records an event, annotates and drains. A node only returns to service after `dcgmi diag` passes | C |
-| **Tenancy and goodput** | Time slicing from a commit, two tenant namespaces with GPU quotas, and a PyTorch job that checkpoints to Garage, loses its GPU to an injected XID 79 and resumes, with every second of the run accounted for | D |
-| **Acceptance** | A 3 hour burn-in with criteria fixed before it ran, `dcgmi diag -r 3` before and after, and a 13 check acceptance runbook backed by this cluster's output | D |
+Every component, the network and the order ArgoCD deploys things in are on the
+[architecture page](https://yassineteimi.github.io/nvidia-gpu-fleet-poc/architecture/).
 
 ## Repository layout
 
@@ -110,14 +128,9 @@ make cost               # how long the GPU has been up and what it has cost
 
 ## Cost
 
-The GPU node only existed during a session. The control plane stayed up between
-sessions, which is what kept Prometheus history from one to the next, and I destroyed
-it once Session D was written up.
-
-| Item | Rate |
-| --- | --- |
-| Scaleway L4-1-24G, 1x L4 24 GB | EUR 0.79/h, up only during a session |
-| Control plane, 4 vCPU / 8 GB | about EUR 0.04/h |
+The L4 costs 0.79 euros an hour and only existed during a session. The small control
+plane, about 4 cents an hour, stayed up between sessions so Prometheus kept its
+history, and I destroyed it after Session D.
 
 ## Secrets
 

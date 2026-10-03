@@ -70,6 +70,7 @@ plugins:
 
 nav:
   - Overview: index.md
+  - "The use cases": use-cases.md
   - "What is simulated": simulated.md
   - Prerequisites: prerequisites.md
   - Architecture: architecture.md

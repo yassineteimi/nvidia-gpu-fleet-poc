@@ -1,14 +1,14 @@
 # Session B: observability and XID alerting
 
-!!! success "Done, 2026-09-24"
-    All five acceptance criteria passed on a real L4. One passed with a caveat: the
-    load job had already finished when I killed it, and I explain that
-    [below](#the-load-job-i-didnt-actually-kill). I also ran the XID alert end to end with an
-    injected XID 79, which I mark as simulated wherever it appears.
+!!! abstract "The use case"
+    A GPU says it's in trouble long before it dies, through error codes called XIDs,
+    memory errors and throttling. The job is to collect those signals and page someone
+    on the ones that matter, not on noise.
 
-**Scope:** Prometheus scrapes the DCGM exporter. A Grafana dashboard from Git shows
-utilisation, framebuffer, temperature, power, ECC, clock event reasons and XID.
-Alert rules cover critical XIDs and a job's utilisation collapsing.
+!!! success "Passed on a real L4, 2026-09-24"
+    All five criteria passed, one with a caveat I explain
+    [below](#the-load-job-i-didnt-actually-kill). A real power-throttling alert fired
+    under load, and a simulated XID 79 reached Alertmanager in 32 seconds.
 
 ## The telemetry path
 
@@ -94,21 +94,23 @@ Red bars are alerts firing; the others are alerts pending, and the load itself. 
 capture ran at 13:53, so the last two bars stop there rather than where the alerts
 resolved.
 
-| Time | Event |
-|---|---|
-| 13:13:48 | `DCGMExporterDown` pending: the target exists but doesn't answer yet. It cleared at 13:14:33 without firing, which is what its 5 minute `for:` is there for |
-| 13:14:18 | The exporter's second and last crash. It couldn't reach the standalone DCGM host engine |
-| 13:15:18 | `DCGMExporterRestarting` fires on those two restarts. It shouldn't have ([why](#two-restarts-and-an-alert-that-miscounted-them)) |
-| 13:23:14 | Load running: `dcgmproftester13` keeps the tensor cores busy, 20 minutes requested |
-| 13:26:18 | `GPUPowerThrottling` pending. I hadn't planned for this one |
-| 13:41:18 | `GPUPowerThrottling` fires after 15 minutes pending |
-| ~13:43 | The load reaches the end of its 20 minutes and exits |
-| 13:43:09 | `make load-stop` |
-| 13:46:03 | `GPUUtilisationCollapse` pending |
-| 13:47:03 | `GPUUtilisationCollapse` firing. Alertmanager has it from 13:47:00 |
-| 13:49:58 | XID 79 injected into DCGM's cache. **Simulated** |
-| 13:50:30 | `GPUXidCritical` reaches Alertmanager, severity critical, `xid="79"` |
-| 14:03:57 | After `make down`: no GPU node left, and its history is still in Prometheus |
+??? note "Every event, minute by minute"
+
+    | Time | Event |
+    |---|---|
+    | 13:13:48 | `DCGMExporterDown` pending: the target exists but doesn't answer yet. It cleared at 13:14:33 without firing, which is what its 5 minute `for:` is there for |
+    | 13:14:18 | The exporter's second and last crash. It couldn't reach the standalone DCGM host engine |
+    | 13:15:18 | `DCGMExporterRestarting` fires on those two restarts. It shouldn't have ([why](#two-restarts-and-an-alert-that-miscounted-them)) |
+    | 13:23:14 | Load running: `dcgmproftester13` keeps the tensor cores busy, 20 minutes requested |
+    | 13:26:18 | `GPUPowerThrottling` pending. I hadn't planned for this one |
+    | 13:41:18 | `GPUPowerThrottling` fires after 15 minutes pending |
+    | ~13:43 | The load reaches the end of its 20 minutes and exits |
+    | 13:43:09 | `make load-stop` |
+    | 13:46:03 | `GPUUtilisationCollapse` pending |
+    | 13:47:03 | `GPUUtilisationCollapse` firing. Alertmanager has it from 13:47:00 |
+    | 13:49:58 | XID 79 injected into DCGM's cache. **Simulated** |
+    | 13:50:30 | `GPUXidCritical` reaches Alertmanager, severity critical, `xid="79"` |
+    | 14:03:57 | After `make down`: no GPU node left, and its history is still in Prometheus |
 
 ## The L4 under load
 
@@ -226,156 +228,158 @@ healthy GPU but not a new one. An acceptance procedure should read these counter
 handover rather than assume they start at zero. I read these values off the
 screenshots; I didn't capture them as text.
 
-## What I changed because of the session
-
-| Change | Reason |
-|---|---|
-| `DCGMExporterRestarting` uses `changes()` | It fired on two restarts |
-| "XIDs by code" and "Clock events by reason" plot cumulative counts | Both stayed flat through a real XID series and a real power cap |
-| `capture-b` expects no `DCGM_FI_DEV_XID_ERRORS` series before the first XID | My first capture reported a correct absence as missing |
-| `make load` defaults to an hour; `make load-stop` records whether it killed anything | The stop deleted a job that had already finished |
-
----
-
 ## How I built it
 
-The rest of this page is the preparation: the plan, the decisions, and the work done
-before any GPU was rented.
+??? note "What I changed because of the session"
 
-### The plan
+    | Change | Reason |
+    |---|---|
+    | `DCGMExporterRestarting` uses `changes()` | It fired on two restarts |
+    | "XIDs by code" and "Clock events by reason" plot cumulative counts | Both stayed flat through a real XID series and a real power cap |
+    | `capture-b` expects no `DCGM_FI_DEV_XID_ERRORS` series before the first XID | My first capture reported a correct absence as missing |
+    | `make load` defaults to an hour; `make load-stop` records whether it killed anything | The stop deleted a job that had already finished |
 
-Three parts, and only the middle one rents a GPU.
+    ---
 
-| Part | What | GPU cost |
-|---|---|---|
-| B1, authoring | Storage, kube-prometheus-stack, custom counters, alert rules and their unit tests, dashboard, and the scripts that drive B2. Deployed to the control plane only | none |
-| B2, live | GPU up, targets checked, real load, job killed, alert watched firing, evidence captured, GPU down | about an hour |
-| B3, write-up | This page from the artifacts, then updating the landing page so nothing claims Sessions C or D are done | none |
+??? note "The plan, the decisions and how I checked them"
 
-### Decisions
+    The rest of this page is the preparation: the plan, the decisions, and the work done
+    before any GPU was rented.
 
-| Decision | Choice | Why |
-|---|---|---|
-| Metrics storage | local-path provisioner on the control plane disk | History survives pod restarts and every GPU node teardown, with no cloud credentials in the cluster. I'd lose it only if I rebuilt the control plane |
-| Where monitoring runs | Pinned to the control plane by node selector | Otherwise a volume could land on the GPU node and be destroyed with it at the end of the session |
-| Alert routing | Alertmanager with a null receiver | The acceptance test needs to see an alert fire, and the Alertmanager API records that. No webhook or SMTP credential to manage |
-| Proving the XID rule | `promtool` unit tests, plus an optional DCGM injection | I can't make a real XID happen on demand. The unit tests prove the rule's logic; the injection proves the pipeline, and it's listed as simulated |
-| Load for the collapse alert | `dcgmproftester` from the DCGM image | A real tensor workload, with no extra image to pull onto a node billed by the hour. I checked it was in the image before renting a GPU |
+    **The plan**
 
-### What reading the source changed
+    Three parts, and only the middle one rents a GPU.
 
-Before writing anything I checked the plan against the exporter and the operator chart
-at the versions this cluster runs. Three things changed.
+    | Part | What | GPU cost |
+    |---|---|---|
+    | B1, authoring | Storage, kube-prometheus-stack, custom counters, alert rules and their unit tests, dashboard, and the scripts that drive B2. Deployed to the control plane only | none |
+    | B2, live | GPU up, targets checked, real load, job killed, alert watched firing, evidence captured, GPU down | about an hour |
+    | B3, write-up | This page from the artifacts, then updating the landing page so nothing claims Sessions C or D are done | none |
 
-**There's a proper XID counter, and it's off by default.** dcgm-exporter `4.8.3`, the
-version GPU Operator `v26.7.0` deploys, has `DCGM_EXP_XID_ERRORS_TOTAL`: a counter with
-one series per `xid` label, meant for `increase()` and `rate()`. That fixes the problem
-in [Findings](findings.md), where `DCGM_FI_DEV_XID_ERRORS` only holds the last XID and
-never resets, so you can't alert on it directly. The default counter set comments it
-out, along with every ECC counter, the power and thermal violation counters,
-`DCGM_FI_PROF_SM_ACTIVE` and the clock event counters. My custom counter set, kept in
-Git, turns them all on.
+    **Decisions**
 
-It doesn't catch everything, because it's derived from the same DCGM field. An XID
-that DCGM never reports, like XID 62, stays invisible. That's why Session C's fault
-detection reads the kernel log and only uses DCGM to corroborate.
+    | Decision | Choice | Why |
+    |---|---|---|
+    | Metrics storage | local-path provisioner on the control plane disk | History survives pod restarts and every GPU node teardown, with no cloud credentials in the cluster. I'd lose it only if I rebuilt the control plane |
+    | Where monitoring runs | Pinned to the control plane by node selector | Otherwise a volume could land on the GPU node and be destroyed with it at the end of the session |
+    | Alert routing | Alertmanager with a null receiver | The acceptance test needs to see an alert fire, and the Alertmanager API records that. No webhook or SMTP credential to manage |
+    | Proving the XID rule | `promtool` unit tests, plus an optional DCGM injection | I can't make a real XID happen on demand. The unit tests prove the rule's logic; the injection proves the pipeline, and it's listed as simulated |
+    | Load for the collapse alert | `dcgmproftester` from the DCGM image | A real tensor workload, with no extra image to pull onto a node billed by the hour. I checked it was in the image before renting a GPU |
 
-**Standalone DCGM was my choice, not the chart default.** Session A's values set
-`dcgm.enabled: true` under a comment that made it sound like the default. The chart
-default is `false`, with DCGM embedded in the exporter. I kept standalone because
-Session C gates return to service on `dcgmi diag`, which needs a DCGM to run against,
-but I fixed the comment. It also made standalone DCGM my main suspect for Session A's
-exporter restarts, and the session proved that suspicion right.
+    **What reading the source changed**
 
-**The monitoring CRDs have to exist before the GPU Operator.** The operator chart
-creates a ServiceMonitor for the exporter by default, and that can't exist until the
-Prometheus Operator's CRDs do. So kube-prometheus-stack moved to sync wave 0, next to
-Node Feature Discovery, instead of wave 1.
+    Before writing anything I checked the plan against the exporter and the operator chart
+    at the versions this cluster runs. Three things changed.
 
-### B1: writing it
+    **There's a proper XID counter, and it's off by default.** dcgm-exporter `4.8.3`, the
+    version GPU Operator `v26.7.0` deploys, has `DCGM_EXP_XID_ERRORS_TOTAL`: a counter with
+    one series per `xid` label, meant for `increase()` and `rate()`. That fixes the problem
+    in [Findings](findings.md), where `DCGM_FI_DEV_XID_ERRORS` only holds the last XID and
+    never resets, so you can't alert on it directly. The default counter set comments it
+    out, along with every ECC counter, the power and thermal violation counters,
+    `DCGM_FI_PROF_SM_ACTIVE` and the clock event counters. My custom counter set, kept in
+    Git, turns them all on.
 
-I wrote and checked everything before any of it reached the cluster.
+    It doesn't catch everything, because it's derived from the same DCGM field. An XID
+    that DCGM never reports, like XID 62, stays invisible. That's why Session C's fault
+    detection reads the kernel log and only uses DCGM to corroborate.
 
-| Piece | Where | How I checked it first |
-|---|---|---|
-| Health checks for Application resources, so the sync waves actually wait | `gitops/bootstrap/argocd-values.yaml` | Copied from ArgoCD's documentation for v3.5.3 |
-| Storage that refuses volumes on the GPU node | `gitops/apps/local-path-provisioner.yaml`, `gitops/values/local-path-provisioner.yaml` | Every key exists in the chart's values at v0.0.37 |
-| kube-prometheus-stack, pinned to the control plane | `gitops/apps/kube-prometheus-stack.yaml`, `gitops/values/kube-prometheus-stack.yaml` | Every key exists in the chart's values at 91.4.1, and in the Grafana 13.2.5 and kube-state-metrics 8.5.0 subcharts it pins |
-| 34 DCGM fields, kept in Git: 33 metrics and the driver version as a label | `gitops/values/gpu-operator.yaml` | Field names copied from dcgm-exporter 4.6.0-4.8.3's own counter file; the ConfigMap wiring traced through the operator's chart template and controller |
-| 9 alert rules | `gitops/manifests/observability/gpu-alerts.yaml` | `promtool` 3.14.0, the version the chart deploys: syntax, then 11 test cases and 25 alert evaluations at the time. I broke four rules on purpose, and each time the matching test failed |
-| The dashboard, 21 panels | `gitops/manifests/observability/dashboards/gpu-fleet.json` | All 34 queries parse in `promtool`; every DCGM metric they use is in the counter set; `kustomize build` produces the ConfigMap with the sidecar's label |
-| The B2 scripts | `scripts/check-dcgm-image.sh`, `load.sh`, `inject-xid-dcgm.sh`, `capture-b.sh`, `grafana-ui.sh` | `shellcheck`. Every `dcgmproftester` and `dcgmi test --inject` flag read from DCGM's source; field IDs 230 and 1004 from `dcgm_fields.h` |
+    **Standalone DCGM was my choice, not the chart default.** Session A's values set
+    `dcgm.enabled: true` under a comment that made it sound like the default. The chart
+    default is `false`, with DCGM embedded in the exporter. I kept standalone because
+    Session C gates return to service on `dcgmi diag`, which needs a DCGM to run against,
+    but I fixed the comment. It also made standalone DCGM my main suspect for Session A's
+    exporter restarts, and the session proved that suspicion right.
 
-Three things I couldn't check from where I wrote this. First, whether the charts render
-with these values, since `helm` and the chart repositories weren't reachable; ArgoCD's
-first sync answers that. Second, whether an injected value reaches the exporter's XID
-counter. Third, whether `dcgmproftester` runs on an L4 next to a standalone DCGM. B2
-answered the last two.
+    **The monitoring CRDs have to exist before the GPU Operator.** The operator chart
+    creates a ServiceMonitor for the exporter by default, and that can't exist until the
+    Prometheus Operator's CRDs do. So kube-prometheus-stack moved to sync wave 0, next to
+    Node Feature Discovery, instead of wave 1.
 
-### B1: deploying it
+    **B1: writing it**
 
-I ran `make argocd` first, so ArgoCD would check the health of Application resources,
-and only then pushed to `main`. Pushing first would have deployed the stack with the
-creation-only ordering the health checks exist to prevent.
+    I wrote and checked everything before any of it reached the cluster.
 
-```{ .sh .terminal }
-$ kubectl -n argocd get applications.argoproj.io
-NAME                     SYNC STATUS   HEALTH STATUS
-gpu-observability        Synced        Healthy
-gpu-operator             Synced        Healthy
-kube-prometheus-stack    Synced        Healthy
-local-path-provisioner   Synced        Healthy
-node-feature-discovery   Synced        Healthy
-root                     Synced        Healthy
-```
+    | Piece | Where | How I checked it first |
+    |---|---|---|
+    | Health checks for Application resources, so the sync waves actually wait | `gitops/bootstrap/argocd-values.yaml` | Copied from ArgoCD's documentation for v3.5.3 |
+    | Storage that refuses volumes on the GPU node | `gitops/apps/local-path-provisioner.yaml`, `gitops/values/local-path-provisioner.yaml` | Every key exists in the chart's values at v0.0.37 |
+    | kube-prometheus-stack, pinned to the control plane | `gitops/apps/kube-prometheus-stack.yaml`, `gitops/values/kube-prometheus-stack.yaml` | Every key exists in the chart's values at 91.4.1, and in the Grafana 13.2.5 and kube-state-metrics 8.5.0 subcharts it pins |
+    | 34 DCGM fields, kept in Git: 33 metrics and the driver version as a label | `gitops/values/gpu-operator.yaml` | Field names copied from dcgm-exporter 4.6.0-4.8.3's own counter file; the ConfigMap wiring traced through the operator's chart template and controller |
+    | 9 alert rules | `gitops/manifests/observability/gpu-alerts.yaml` | `promtool` 3.14.0, the version the chart deploys: syntax, then 11 test cases and 25 alert evaluations at the time. I broke four rules on purpose, and each time the matching test failed |
+    | The dashboard, 21 panels | `gitops/manifests/observability/dashboards/gpu-fleet.json` | All 34 queries parse in `promtool`; every DCGM metric they use is in the counter set; `kustomize build` produces the ConfigMap with the sidecar's label |
+    | The B2 scripts | `scripts/check-dcgm-image.sh`, `load.sh`, `inject-xid-dcgm.sh`, `capture-b.sh`, `grafana-ui.sh` | `shellcheck`. Every `dcgmproftester` and `dcgmi test --inject` flag read from DCGM's source; field IDs 230 and 1004 from `dcgm_fields.h` |
 
-All four new or changed Applications synced on the first try, which settled whether
-the charts render with these values.
+    Three things I couldn't check from where I wrote this. First, whether the charts render
+    with these values, since `helm` and the chart repositories weren't reachable; ArgoCD's
+    first sync answers that. Second, whether an injected value reaches the exporter's XID
+    counter. Third, whether `dcgmproftester` runs on an L4 next to a standalone DCGM. B2
+    answered the last two.
 
-```{ .sh .terminal }
-$ kubectl -n monitoring get pods,pvc
-NAME                                                            READY   STATUS    RESTARTS   AGE
-pod/alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running   0          2m41s
-pod/kube-prometheus-stack-grafana-74ccfb594b-lxdqs              3/3     Running   0          56s
-pod/kube-prometheus-stack-kube-state-metrics-84f8496f5c-8kmbq   1/1     Running   0          2m49s
-pod/kube-prometheus-stack-operator-5b5dcc8f66-pdbvl             1/1     Running   0          2m49s
-pod/kube-prometheus-stack-prometheus-node-exporter-28d9r        1/1     Running   0          2m49s
-pod/prometheus-kube-prometheus-stack-prometheus-0               2/2     Running   0          2m40s
+    **B1: deploying it**
 
-NAME                                                                                                   STATUS   CAPACITY   STORAGECLASS
-persistentvolumeclaim/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0   Bound    25Gi       local-path
-```
+    I ran `make argocd` first, so ArgoCD would check the health of Application resources,
+    and only then pushed to `main`. Pushing first would have deployed the stack with the
+    creation-only ordering the health checks exist to prevent.
 
-I cut the claim's `VOLUME`, `ACCESS MODES`, `VOLUMEATTRIBUTESCLASS` and `AGE` columns
-for width. The 25 Gi volume bound through local-path is what lets GPU metrics outlive
-the GPU node.
+    ```{ .sh .terminal }
+    $ kubectl -n argocd get applications.argoproj.io
+    NAME                     SYNC STATUS   HEALTH STATUS
+    gpu-observability        Synced        Healthy
+    gpu-operator             Synced        Healthy
+    kube-prometheus-stack    Synced        Healthy
+    local-path-provisioner   Synced        Healthy
+    node-feature-discovery   Synced        Healthy
+    root                     Synced        Healthy
+    ```
 
-### Checking the DCGM image without a GPU
+    All four new or changed Applications synced on the first try, which settled whether
+    the charts render with these values.
 
-Before renting a GPU, I ran the DCGM image the GPU Operator uses,
-`nvcr.io/nvidia/cloud-native/dcgm:4.6.0-1-ubuntu24.04`, on the control plane
-([`session-b-dcgm-image-check.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-dcgm-image-check.txt)):
+    ```{ .sh .terminal }
+    $ kubectl -n monitoring get pods,pvc
+    NAME                                                            READY   STATUS    RESTARTS   AGE
+    pod/alertmanager-kube-prometheus-stack-alertmanager-0           2/2     Running   0          2m41s
+    pod/kube-prometheus-stack-grafana-74ccfb594b-lxdqs              3/3     Running   0          56s
+    pod/kube-prometheus-stack-kube-state-metrics-84f8496f5c-8kmbq   1/1     Running   0          2m49s
+    pod/kube-prometheus-stack-operator-5b5dcc8f66-pdbvl             1/1     Running   0          2m49s
+    pod/kube-prometheus-stack-prometheus-node-exporter-28d9r        1/1     Running   0          2m49s
+    pod/prometheus-kube-prometheus-stack-prometheus-0               2/2     Running   0          2m40s
 
-```{ .sh .terminal }
-== dcgmproftester binaries
-/usr/bin/dcgmproftester12
-/usr/bin/dcgmproftester13
-...
-== dcgmi test --help (injection)
-   dcgmi test --host <IP/FQDN> --inject --gpuid <gpuId> -f <fieldId> -v
-      --inject                Inject values into cache.
-```
+    NAME                                                                                                   STATUS   CAPACITY   STORAGECLASS
+    persistentvolumeclaim/prometheus-kube-prometheus-stack-prometheus-db-prometheus-kube-prometheus-stack-prometheus-0   Bound    25Gi       local-path
+    ```
 
-`dcgmproftester` is there in CUDA 12 and CUDA 13 builds, and `dcgmi test` supports
-`--inject`. So B2 could generate real load without pulling another image, and the
-simulated XID was possible.
+    I cut the claim's `VOLUME`, `ACCESS MODES`, `VOLUMEATTRIBUTESCLASS` and `AGE` columns
+    for width. The 25 Gi volume bound through local-path is what lets GPU metrics outlive
+    the GPU node.
 
-My first version of the check also reported `FAIL  --no-dcgm-validation not found in
-its help`, which was wrong, and the bug was in my check, not the image. It printed
-nothing at all for either binary, not even `-d` and `-t`, so `--help` had never run.
-`dcgmproftester` links against `libcuda`, which only exists on a node with an NVIDIA
-driver; my check piped the loader error through `grep` and read the empty result as
-a missing flag. The script now shows the unfiltered output and the missing libraries,
-and reports that case as inconclusive. On the GPU node, `make load` checks the job 20
-seconds in, so a rejected flag would have cost 20 seconds rather than 10 minutes. The
-flag worked.
+    **Checking the DCGM image without a GPU**
+
+    Before renting a GPU, I ran the DCGM image the GPU Operator uses,
+    `nvcr.io/nvidia/cloud-native/dcgm:4.6.0-1-ubuntu24.04`, on the control plane
+    ([`session-b-dcgm-image-check.txt`](https://github.com/yassineteimi/nvidia-gpu-fleet-poc/blob/main/docs/artifacts/session-b-dcgm-image-check.txt)):
+
+    ```{ .sh .terminal }
+    == dcgmproftester binaries
+    /usr/bin/dcgmproftester12
+    /usr/bin/dcgmproftester13
+    ...
+    == dcgmi test --help (injection)
+       dcgmi test --host <IP/FQDN> --inject --gpuid <gpuId> -f <fieldId> -v
+          --inject                Inject values into cache.
+    ```
+
+    `dcgmproftester` is there in CUDA 12 and CUDA 13 builds, and `dcgmi test` supports
+    `--inject`. So B2 could generate real load without pulling another image, and the
+    simulated XID was possible.
+
+    My first version of the check also reported `FAIL  --no-dcgm-validation not found in
+    its help`, which was wrong, and the bug was in my check, not the image. It printed
+    nothing at all for either binary, not even `-d` and `-t`, so `--help` had never run.
+    `dcgmproftester` links against `libcuda`, which only exists on a node with an NVIDIA
+    driver; my check piped the loader error through `grep` and read the empty result as
+    a missing flag. The script now shows the unfiltered output and the missing libraries,
+    and reports that case as inconclusive. On the GPU node, `make load` checks the job 20
+    seconds in, so a rejected flag would have cost 20 seconds rather than 10 minutes. The
+    flag worked.

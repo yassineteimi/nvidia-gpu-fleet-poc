@@ -118,8 +118,8 @@ small control plane stays up so Prometheus history survives between sessions.
 
 | Item | Rate | Note |
 |---|---|---|
-| L4-1-24G GPU node | EUR 0.79/h | Only up during a session |
-| Control plane, 4 vCPU / 8 GB | about EUR 0.04/h | About EUR 29/month if left running |
-| Block storage and public IPs | a few EUR/month | |
+| L4-1-24G GPU node | 0.79 euros an hour | Only up during a session |
+| Control plane, 4 vCPU / 8 GB | about 4 cents an hour | About 29 euros a month if left running |
+| Block storage and public IPs | a few euros a month | |
 
 `make cost` shows how long the GPU node has been up in the current session.

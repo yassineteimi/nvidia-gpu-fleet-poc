@@ -34,7 +34,7 @@ PROM="/api/v1/namespaces/monitoring/services/kube-prometheus-stack-prometheus:90
 mkdir -p "$OUT"
 
 stamp() { date -u +%Y-%m-%dT%H:%M:%SZ; }
-gpu_node() { kubectl_cp get nodes -l nvidia.com/gpu.present=true -o jsonpath='{.items[0].metadata.name}'; }
+gpu_node() { kubectl_cp get nodes -l nvidia.com/gpu.present=true -o jsonpath='{.items[*].metadata.name}' 2>/dev/null | awk '{print $1}' || true; }
 enc() { jq -rn --arg q "$1" '$q|@uri'; }
 
 case "${1:-status}" in
@@ -115,6 +115,9 @@ YAML
 
   capture)
     job_json="$(kubectl_cp -n "$NS" get job "$JOB" -o json)"
+    # The node may already be gone (capture can run after make down): its name
+    # comes from Terraform's outputs, which keep it.
+    node="$(gpu_node)"; [ -n "$node" ] || node="$(tf_output gpu_node_name)"
     start="$(jq -r '.status.startTime // empty' <<<"$job_json")"
     end="$(jq -r '.status.completionTime // empty' <<<"$job_json")"
     [ -n "$end" ] || die "the burn-in Job hasn't completed ($(jq -c .status <<<"$job_json"))"
@@ -129,7 +132,7 @@ YAML
     delta() { q "max(max_over_time($1[${d}s]) - min_over_time($1[${d}s]))"; }
 
     {
-      echo "captured_at=$(stamp) node=$(gpu_node)"
+      echo "captured_at=$(stamp) node=$node"
       echo "job_start=$start job_completion=$end succeeded=$(jq -r '.status.succeeded // 0' <<<"$job_json") failed=$(jq -r '.status.failed // 0' <<<"$job_json")"
       echo "window: ${d} s of steady state, from start + 60 s to completion - 60 s"
       echo "== load held"
@@ -138,18 +141,30 @@ YAML
       echo "GPU utilisation, min: $(q "min(min_over_time(DCGM_FI_DEV_GPU_UTIL[${d}s]))")"
       echo "== thermals and power"
       echo "GPU temperature C, mean / max: $(q "avg(avg_over_time(DCGM_FI_DEV_GPU_TEMP[${d}s]))") / $(q "max(max_over_time(DCGM_FI_DEV_GPU_TEMP[${d}s]))")"
-      echo "memory temperature C, max: $(q "max(max_over_time(DCGM_FI_DEV_MEMORY_TEMP[${d}s]))")"
+      # The L4's GDDR6 reports no memory temperature: 0 here means "not reported".
+      echo "memory temperature C, max (0 = not reported by this GPU): $(q "max(max_over_time(DCGM_FI_DEV_MEMORY_TEMP[${d}s]))")"
       echo "power W, mean / max: $(q "avg(avg_over_time(DCGM_FI_DEV_POWER_USAGE[${d}s]))") / $(q "max(max_over_time(DCGM_FI_DEV_POWER_USAGE[${d}s]))")"
       echo "SM clock MHz, min / mean / max: $(q "min(min_over_time(DCGM_FI_DEV_SM_CLOCK[${d}s]))") / $(q "avg(avg_over_time(DCGM_FI_DEV_SM_CLOCK[${d}s]))") / $(q "max(max_over_time(DCGM_FI_DEV_SM_CLOCK[${d}s]))")"
-      echo "time under power violation, us: $(delta DCGM_FI_DEV_POWER_VIOLATION)"
-      echo "time under thermal violation, us: $(delta DCGM_FI_DEV_THERMAL_VIOLATION)"
+      # Both violation counters are in nanoseconds (the counter file in
+      # gitops/values/gpu-operator.yaml says so, and the alert thresholds assume
+      # it). Reported as seconds and as a share of the window.
+      for kind in power thermal; do
+        ns="$(delta "DCGM_FI_DEV_$(tr '[:lower:]' '[:upper:]' <<<"$kind")_VIOLATION")"
+        echo "time under $kind violation: $(jq -rn --arg ns "$ns" --argjson d "$d" \
+          'if ($ns | test("^[0-9.e+]+$")) then "\($ns | tonumber / 1e9 | floor) s, \($ns | tonumber / 1e9 / $d * 1000 | round / 10)% of the window" else $ns end')"
+      done
       echo "== errors over the window (max minus min)"
       for m in DCGM_FI_DEV_ECC_SBE_VOL_TOTAL DCGM_FI_DEV_ECC_DBE_VOL_TOTAL DCGM_FI_DEV_ECC_SBE_AGG_TOTAL \
                DCGM_FI_DEV_ECC_DBE_AGG_TOTAL DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS \
                DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS DCGM_FI_DEV_ROW_REMAP_FAILURE DCGM_FI_DEV_PCIE_REPLAY_COUNTER; do
         echo "$m: $(delta "$m")"
       done
-      echo "DCGM_FI_DEV_XID_ERRORS changes: $(q "max(changes(DCGM_FI_DEV_XID_ERRORS[${d}s]))") max value: $(q "max(max_over_time(DCGM_FI_DEV_XID_ERRORS[${d}s]))")"
+      # DCGM keeps the XID field blank until the GPU records an XID, and
+      # dcgm-exporter (4.6.0-4.8.3, gpu_collector.go toString) drops blank values,
+      # so "no data" means no XID since the host engine started. The second
+      # source is independent: node-problem-detector's condition from the kernel log.
+      echo "DCGM_FI_DEV_XID_ERRORS changes: $(q "max(changes(DCGM_FI_DEV_XID_ERRORS[${d}s]))") (no data = the field stayed blank, no XID recorded)"
+      echo "GPUUnhealthy=True on the node at any point, from node-problem-detector: $(q "max(max_over_time(kube_node_status_condition{condition=\"GPUUnhealthy\",status=\"true\",node=\"$node\"}[${d}s]))")"
       echo "== telemetry gaps"
       echo "temperature samples in the window: $(q "max(count_over_time(DCGM_FI_DEV_GPU_TEMP[${d}s]))")"
       # One point a minute over the steady window: a minute whose last 60 s hold
@@ -160,9 +175,12 @@ YAML
         | jq '[.data.result[0].values[]? | select((.[1] | tonumber) > 0)] | length')"
       echo "minutes without a temperature sample: $(( (at - s - 120) / 60 + 1 - have ))"
       echo "gpu-operator container restarts: $(q "sum(max_over_time(kube_pod_container_status_restarts_total{namespace=\"gpu-operator\"}[${d}s]) - min_over_time(kube_pod_container_status_restarts_total{namespace=\"gpu-operator\"}[${d}s]))")"
-      echo "== clock event reasons, bitmask value: minutes seen"
-      kubectl_cp get --raw "$PROM/api/v1/query_range?query=$(enc 'max(DCGM_FI_DEV_CLOCKS_EVENT_REASONS)')&start=$(( s + 60 ))&end=$at&step=60" \
-        | jq -r '[.data.result[0].values[]?[1]] | group_by(.) | map("\(.[0]): \(length)") | .[]'
+      # The raw bitmask field is only watched by the exporter, not exported; its
+      # edge-counted DCGM_EXP_CLOCK_EVENTS_TOTAL is. A reason that stays active
+      # for the whole window counts once, when it starts.
+      echo "== clock events that started in the window, by reason"
+      kubectl_cp get --raw "$PROM/api/v1/query?time=$at&query=$(enc "sum by (clock_event) (max_over_time(DCGM_EXP_CLOCK_EVENTS_TOTAL[${d}s]) - min_over_time(DCGM_EXP_CLOCK_EVENTS_TOTAL[${d}s]))")" \
+        | jq -r '.data.result[]? | "\(.metric.clock_event): \(.value[1])"'
     } | tee "$OUT/session-d-burn-in.txt"
 
     # The series behind the charts in the write-up, one row a minute.

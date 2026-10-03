@@ -1,9 +1,10 @@
 # Architecture
 
 Two Scaleway instances running upstream Kubernetes through kubeadm, with no vendor
-distribution. The control plane stays up; the GPU node exists only during a session.
-Every diagram on this page shows what's deployed today, taken from the pod lists
-captured in `docs/artifacts/`.
+distribution. The control plane stayed up for the whole project; the GPU node existed
+only during a session. Every diagram on this page shows what ran at the end of Session
+D, taken from the pod lists captured in `docs/artifacts/`. I destroyed the cluster on
+2026-10-03, and `make cluster && make argocd && make up` rebuilds all of it from Git.
 
 ## The whole picture
 
@@ -17,7 +18,7 @@ flowchart LR
 
   subgraph cluster["kubeadm cluster in Scaleway region fr-par"]
     direction TB
-    cp["gpu-fleet-cp-01<br/>fr-par-2, control plane, always on<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator,<br/>Garage checkpoint store"]
+    cp["gpu-fleet-cp-01<br/>fr-par-2, control plane,<br/>kept between sessions<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator,<br/>Garage checkpoint store"]
     gpu["gpu-fleet-gpu-01<br/>any fr-par zone, NVIDIA L4, per session<br/>driver, device plugin, DCGM,<br/>node-problem-detector"]
     cp <-->|"API, pod network"| gpu
   end
@@ -273,8 +274,8 @@ of another chart.
 
 The GPU node holds nothing stateful, so I destroy it at the end of every session. That
 teardown is a real node lifecycle event, the same cordon, drain and remove the
-remediation controller runs when a GPU goes bad. The control plane stays up because
-Prometheus history has to survive between sessions: after Session B's GPU node was
+remediation controller runs when a GPU goes bad. The control plane stayed up because
+Prometheus history had to survive between sessions: after Session B's GPU node was
 gone, its 193 samples were still there.
 
 ## Joining the GPU node

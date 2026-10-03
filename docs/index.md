@@ -15,7 +15,9 @@ output on these pages was captured during the sessions and links back to files i
 - A measured goodput figure for a training job that gets interrupted, plus an
   acceptance runbook with exit criteria.
 
-All four sessions are done. The table below is the only place I claim progress.
+All four sessions are done, and on 2026-10-03 I destroyed the cluster, so nothing on
+these pages is a live system: every result links to output committed during a session.
+The table below is the only place I claim progress.
 
 ## Build status
 
@@ -59,7 +61,7 @@ $ make up                                            # every session
 ## Stack
 
 Upstream Kubernetes through kubeadm, no vendor distribution. A Scaleway L4-1-24G GPU
-node and a small control plane that stays up between sessions, both created by
+node and a small control plane that stayed up between sessions, both created by
 Terraform. ArgoCD app-of-apps from the first commit, the NVIDIA GPU Operator with Node
 Feature Discovery, the DCGM exporter and kube-prometheus-stack. Sessions C and D add
 node-problem-detector with a GPU monitor, a remediation controller in Python on the

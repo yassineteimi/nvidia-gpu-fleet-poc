@@ -24,6 +24,12 @@ The main item: the GPU never actually failed. In Session B I injected an XID int
 to test alerting, and in Session C I wrote them into the node's kernel log to test
 detection and remediation.
 
+> **The cluster is switched off.** I destroyed both nodes and the network on 2026-10-03,
+> after Session D, so nothing is billing. Every result on these pages comes from output
+> committed to `docs/artifacts/`, not from a live system. `make cluster && make argocd`
+> rebuilds the control plane from this repository in about 30 minutes, and `make up`
+> adds the GPU node.
+
 ## Architecture
 
 ```mermaid
@@ -36,7 +42,7 @@ flowchart LR
 
   subgraph cluster["kubeadm cluster in Scaleway region fr-par"]
     direction TB
-    cp["gpu-fleet-cp-01<br/>fr-par-2, control plane, always on<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator,<br/>Garage checkpoint store"]
+    cp["gpu-fleet-cp-01<br/>fr-par-2, control plane,<br/>kept between sessions<br/>ArgoCD, Prometheus, Grafana,<br/>GPU Operator, gpu-remediator,<br/>Garage checkpoint store"]
     gpu["gpu-fleet-gpu-01<br/>any fr-par zone, NVIDIA L4, per session<br/>driver, device plugin, DCGM,<br/>node-problem-detector"]
     cp <-->|"API, pod network"| gpu
   end
@@ -104,8 +110,9 @@ make cost               # how long the GPU has been up and what it has cost
 
 ## Cost
 
-The GPU node only exists during a session. The control plane stays up, which is also
-what keeps Prometheus history between sessions.
+The GPU node only existed during a session. The control plane stayed up between
+sessions, which is what kept Prometheus history from one to the next, and I destroyed
+it once Session D was written up.
 
 | Item | Rate |
 | --- | --- |

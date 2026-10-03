@@ -1,0 +1,11 @@
+PASS  node Ready
+PASS  GPU enumerated: 1 x NVIDIA-L4-SHARED
+PASS  NFD sees PCI vendor 10de
+PASS  driver 595.91.07 matches Git
+PASS  container toolkit v1.20.0 matches Git
+PASS  DCGM_FI_DEV_ECC_DBE_AGG_TOTAL is 0
+PASS  DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS is 0
+PASS  DCGM_FI_DEV_ROW_REMAP_FAILURE is 0
+PASS  row remapper: nothing pending, no failure
+INFO  history the card arrived with: SBE aggregate 0, correctable remapped rows 0
+PASS  DCGM exporter scraped by Prometheus

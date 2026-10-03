@@ -1,0 +1,29 @@
+captured_at=2026-10-03T06:48:07Z node=gpu-fleet-gpu-01
+job_start=2026-10-02T19:35:27Z job_completion=2026-10-02T22:35:34Z succeeded=1 failed=0
+window: 10687 s of steady state, from start + 60 s to completion - 60 s
+== load held
+tensor active, mean: 0.9503215926966292
+tensor active, min:  0.948897
+GPU utilisation, min: 98
+== thermals and power
+GPU temperature C, mean / max: 64.68820224719101 / 65
+memory temperature C, max: 0
+power W, mean / max: 71.97567415730337 / 72.408
+SM clock MHz, min / mean / max: 870 / 889.9719101123595 / 945
+time under power violation, us: 10650590732512
+time under thermal violation, us: 0
+== errors over the window (max minus min)
+DCGM_FI_DEV_ECC_SBE_VOL_TOTAL: 0
+DCGM_FI_DEV_ECC_DBE_VOL_TOTAL: 0
+DCGM_FI_DEV_ECC_SBE_AGG_TOTAL: 0
+DCGM_FI_DEV_ECC_DBE_AGG_TOTAL: 0
+DCGM_FI_DEV_CORRECTABLE_REMAPPED_ROWS: 0
+DCGM_FI_DEV_UNCORRECTABLE_REMAPPED_ROWS: 0
+DCGM_FI_DEV_ROW_REMAP_FAILURE: 0
+DCGM_FI_DEV_PCIE_REPLAY_COUNTER: 0
+DCGM_FI_DEV_XID_ERRORS changes: no data max value: no data
+== telemetry gaps
+temperature samples in the window: 712
+minutes without a temperature sample: 0
+gpu-operator container restarts: 0
+== clock event reasons, bitmask value: minutes seen

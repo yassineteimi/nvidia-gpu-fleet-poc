@@ -68,28 +68,38 @@ EOF
 ########################################
 
 check_leftovers() {
-  local zone api servers volumes
+  local zone region zones api servers volumes found=0
   zone="$(tf_output gpu_zone)"
   [ -n "$zone" ] || zone="$(tf_output zone)"
-  [ -n "$zone" ] || { warn "no zone in the Terraform outputs, skipping the leftover check"; return 0; }
+  # Every zone of the region, not only the GPU zone of the moment: in Session D
+  # a failed boot in fr-par-2 left a volume behind, the next attempt moved the
+  # GPU zone to fr-par-1, and a check of the GPU zone alone missed it for three
+  # days. LEFTOVER_ZONES overrides the list.
+  region="${zone%-*}"
+  zones="${LEFTOVER_ZONES:-${region:+$region-1 $region-2 $region-3}}"
+  [ -n "$zones" ] || { warn "no zone in the Terraform outputs, skipping the leftover check"; return 0; }
   api="https://api.scaleway.com"
 
-  servers="$(curl -fsS -H "X-Auth-Token: $SCW_SECRET_KEY" "$api/instance/v1/zones/$zone/servers?name=$GPU_NODE_NAME" 2>/dev/null \
-    | jq -r --arg n "$GPU_NODE_NAME" '.servers[] | select(.name == $n) | "\(.id) state=\(.state)"' || true)"
-  volumes="$(curl -fsS -H "X-Auth-Token: $SCW_SECRET_KEY" "$api/block/v1alpha1/zones/$zone/volumes" 2>/dev/null \
-    | jq -r '.volumes[] | select((.references // []) | length == 0) | "\(.id) \(.name) \(.size / 1e9)GB created=\(.created_at)"' || true)"
+  for zone in $zones; do
+    servers="$(curl -fsS -H "X-Auth-Token: $SCW_SECRET_KEY" "$api/instance/v1/zones/$zone/servers?name=$GPU_NODE_NAME" 2>/dev/null \
+      | jq -r --arg n "$GPU_NODE_NAME" '.servers[] | select(.name == $n) | "\(.id) state=\(.state)"' || true)"
+    volumes="$(curl -fsS -H "X-Auth-Token: $SCW_SECRET_KEY" "$api/block/v1alpha1/zones/$zone/volumes" 2>/dev/null \
+      | jq -r '.volumes[] | select((.references // []) | length == 0) | "\(.id) \(.name) \(.size / 1e9)GB created=\(.created_at)"' || true)"
+    [ -z "$servers" ] && [ -z "$volumes" ] && continue
+    found=1
+    warn "still at Scaleway in $zone, and billing:"
+    [ -n "$servers" ] && printf '    server %s\n' "$servers" >&2
+    [ -n "$volumes" ] && printf '    unattached volume %s\n' "$volumes" >&2
+    warn "check each one is this node's, then delete it through the API, server first:"
+    warn "  curl -X DELETE -H \"X-Auth-Token: \$SCW_SECRET_KEY\" $api/instance/v1/zones/$zone/servers/<id>"
+    warn "  curl -X DELETE -H \"X-Auth-Token: \$SCW_SECRET_KEY\" $api/block/v1alpha1/zones/$zone/volumes/<id>"
+  done
 
-  if [ -z "$servers" ] && [ -z "$volumes" ]; then
-    log "Scaleway shows no GPU server and no unattached volume left in $zone"
-    return 0
+  if [ "$found" -eq 0 ]; then
+    log "Scaleway shows no GPU server and no unattached volume in $zones"
+  else
+    warn "then, if a server was listed: terraform -chdir=terraform state rm 'scaleway_instance_server.gpu_node[0]' && make down"
   fi
-  warn "still at Scaleway in $zone, and billing:"
-  [ -n "$servers" ] && printf '    server %s\n' "$servers" >&2
-  [ -n "$volumes" ] && printf '    unattached volume %s\n' "$volumes" >&2
-  warn "check each one is this node's, then delete it through the API, server first:"
-  warn "  curl -X DELETE -H \"X-Auth-Token: \$SCW_SECRET_KEY\" $api/instance/v1/zones/$zone/servers/<id>"
-  warn "  curl -X DELETE -H \"X-Auth-Token: \$SCW_SECRET_KEY\" $api/block/v1alpha1/zones/$zone/volumes/<id>"
-  warn "then: terraform -chdir=terraform state rm 'scaleway_instance_server.gpu_node[0]' && make down"
 }
 
 log "terraform apply, destroying the GPU node"

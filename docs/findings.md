@@ -355,9 +355,16 @@ there and billing, and Terraform had no idea it existed. I found it by listing t
 zone's block volumes, deleted the server and the volume through the API, removed the
 server from the Terraform state and ran `make down` again for the IP.
 
-`make down` now asks the API what's left in the GPU node's zone every time it runs,
-whether the apply worked or not: a server with the node's name, and any block volume
-with nothing attached. It prints them with the delete commands. It doesn't delete
+It had happened once already, and I didn't know. The very first attempt that day, in
+fr-par-2, failed with `out of stock` and left its own 150 GB volume behind. I only
+found it three days later, after destroying the whole cluster, when a last sweep of
+both zones still showed one volume: created at 14:21 on 2026-09-30, the minute of that
+first failure. My leftover check had been looking only at the GPU node's current zone,
+which by then was fr-par-1.
+
+`make down` now asks the API what's left in every zone of the region every time it
+runs, whether the apply worked or not: a server with the node's name, and any block
+volume with nothing attached. It prints them with the delete commands. It doesn't delete
 them: a volume picked by name alone is a guess, and a wrong guess deletes something
 that isn't mine.
 

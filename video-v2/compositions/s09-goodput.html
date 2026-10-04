@@ -1,0 +1,202 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #s09-root {
+          position: absolute;
+          inset: 0;
+        }
+        #s09-donut {
+          position: absolute;
+          left: 80px;
+          top: 230px;
+          width: 470px;
+          height: 470px;
+          overflow: visible;
+        }
+        #s09-center {
+          position: absolute;
+          left: 80px;
+          top: 230px;
+          width: 470px;
+          height: 470px;
+        }
+        .s09-c {
+          position: absolute;
+          inset: 0;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+        }
+        .s09-c .big {
+          font-weight: 900;
+          font-size: 92px;
+          letter-spacing: -0.04em;
+          line-height: 1;
+        }
+        .s09-c .small {
+          margin-top: 10px;
+          font-family: var(--mono);
+          font-weight: 700;
+          font-size: 26px;
+          letter-spacing: 0.06em;
+          color: var(--muted);
+        }
+        #s09-c2 .big {
+          color: var(--red);
+        }
+        #s09-legend {
+          position: absolute;
+          left: 610px;
+          top: 290px;
+          width: 390px;
+          font-family: var(--mono);
+          font-size: 26px;
+        }
+        #s09-legend .row {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          height: 56px;
+          color: var(--muted);
+        }
+        #s09-legend .sw {
+          display: block;
+          flex: 0 0 18px;
+          width: 18px;
+          height: 18px;
+          border-radius: 5px;
+        }
+        #s09-legend .val {
+          margin-left: auto;
+          color: var(--fg);
+        }
+        #s09-text {
+          position: absolute;
+          left: 80px;
+          right: 80px;
+          bottom: 100px;
+          height: 210px;
+        }
+        .s09-t {
+          position: absolute;
+          left: 0;
+          right: 0;
+          bottom: 0;
+        }
+        .s09-t .statement {
+          font-size: 88px;
+        }
+        .s09-t .second {
+          margin-top: 18px;
+        }
+      </style>
+
+      <div id="s09-root" data-composition-id="s09" data-width="1080" data-height="1080">
+        <div class="stage" id="s09-stage">
+          <div class="kicker" style="color: #b4a7d6"><i class="dot" style="background: #b4a7d6"></i>Measure · Session D</div>
+          <svg id="s09-donut" viewBox="0 0 470 470"></svg>
+          <div id="s09-center">
+            <div class="s09-c" id="s09-c1"><div class="big num"><span id="s09-pct">0.0</span>%</div><div class="small">GOODPUT</div></div>
+            <div class="s09-c" id="s09-c2"><div class="big num">5:00</div><div class="small">ONE RULE</div></div>
+          </div>
+          <div id="s09-legend"></div>
+          <div id="s09-text">
+            <div class="s09-t" id="s09-t1">
+              <div class="statement">66.4% goodput</div>
+              <div class="second">The share of a training run that went into the model, through an injected GPU fault.</div>
+            </div>
+            <div class="s09-t" id="s09-t2">
+              <div class="statement">83% of the outage:</div>
+              <div class="second">one 5-minute safety rule.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          // docs/artifacts/session-d-goodput.json, in seconds.
+          const parts = [
+            ["useful", 918.2, "#76b900"],
+            ["checkpoint", 32.4, "#8a8fa8"],
+            ["restore", 1.8, "#8a8fa8"],
+            ["other", 11.1, "#5d6370"],
+            ["redone", 58.7, "#b4a7d6"],
+            ["outage", 360.9, "#ff6f61"],
+          ];
+          const total = parts.reduce((a, p) => a + p[1], 0);
+          const NS = "http://www.w3.org/2000/svg";
+          const svg = document.getElementById("s09-donut");
+          const CX = 235, CY = 235, R = 190, C = 2 * Math.PI * R, GAP = 3;
+          let start = 0;
+          const segs = parts.map(([name, v, color]) => {
+            const frac = v / total;
+            const len = Math.max(frac * C - GAP, 0.8);
+            const g = document.createElementNS(NS, "g");
+            const c = document.createElementNS(NS, "circle");
+            c.setAttribute("cx", CX);
+            c.setAttribute("cy", CY);
+            c.setAttribute("r", R);
+            c.setAttribute("fill", "none");
+            c.setAttribute("stroke", color);
+            c.setAttribute("stroke-width", "64");
+            c.setAttribute("stroke-dasharray", "0 " + C);
+            c.setAttribute("transform", "rotate(" + (-90 + start * 360) + " " + CX + " " + CY + ")");
+            g.appendChild(c);
+            svg.appendChild(g);
+            const mid = (-90 + (start + frac / 2) * 360) * (Math.PI / 180);
+            const seg = { name, len, c, g, mid, frac };
+            start += frac;
+            return seg;
+          });
+
+          const legend = document.getElementById("s09-legend");
+          const rows = {};
+          ["useful", "outage", "redone", "checkpoint", "other", "restore"].forEach((n) => {
+            const p = parts.find((x) => x[0] === n);
+            const row = document.createElement("div");
+            row.className = "row";
+            row.innerHTML = '<i class="sw" style="background:' + p[2] + '"></i>' + n + '<span class="val">' + p[1].toFixed(1) + " s</span>";
+            legend.appendChild(row);
+            rows[n] = row;
+          });
+
+          const tl = gsap.timeline({ paused: true });
+          HF.enter(tl, "#s09-stage", 0);
+          // The donut draws clockwise, one segment handing off to the next.
+          let at = 0.3;
+          segs.forEach((s) => {
+            const d = Math.max(0.12, 1.9 * s.frac);
+            tl.fromTo(s.c, { attr: { "stroke-dasharray": "0 " + C } }, { attr: { "stroke-dasharray": s.len + " " + C }, duration: d, ease: "power1.inOut" }, at);
+            at += d;
+          });
+          HF.count(tl, document.getElementById("s09-pct"), 0, 66.4, 0.3, 1.9, { decimals: 1 });
+          tl.fromTo("#s09-legend .row", { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.45, ease: HF.smooth, stagger: 0.07 }, 0.6);
+          tl.fromTo("#s09-t1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 1.2);
+          tl.set("#s09-t2, #s09-c2", { opacity: 0 }, 0);
+
+          // Then the outage: everything else steps back and the red slice comes forward.
+          const out = segs[segs.length - 1];
+          const T = 4.3;
+          segs.slice(0, -1).forEach((s) => tl.to(s.c, { attr: { "stroke-opacity": 0.28 }, duration: 0.5, ease: HF.smooth }, T));
+          tl.to(out.g, { x: 26 * Math.cos(out.mid), y: 26 * Math.sin(out.mid), duration: 0.7, ease: HF.smooth }, T);
+          Object.keys(rows).forEach((n) => {
+            if (n !== "outage") tl.to(rows[n], { opacity: 0.3, duration: 0.5 }, T);
+          });
+          tl.to("#s09-c1", { opacity: 0, scale: 0.94, duration: 0.3, ease: "power2.in" }, T);
+          tl.fromTo("#s09-c2", { opacity: 0, scale: 1.06 }, { opacity: 1, scale: 1, duration: 0.5, ease: HF.smooth }, T + 0.3);
+          tl.to("#s09-t1", { opacity: 0, y: -20, duration: 0.3, ease: "power2.in" }, T);
+          tl.fromTo("#s09-t2", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, T + 0.3);
+          HF.exit(tl, "#s09-stage", 7.6);
+          window.__timelines["s09"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

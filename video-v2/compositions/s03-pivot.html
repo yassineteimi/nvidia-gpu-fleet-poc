@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #s03-root {
+          position: absolute;
+          inset: 0;
+        }
+        #s03-top {
+          position: absolute;
+          left: 80px;
+          right: 80px;
+          top: 110px;
+          font-weight: 900;
+          font-size: 64px;
+          line-height: 1.05;
+          letter-spacing: -0.03em;
+          color: var(--muted);
+        }
+        #s03-cluster {
+          position: absolute;
+          left: 80px;
+          top: 300px;
+          width: 920px;
+          height: 380px;
+        }
+        #s03-cluster svg {
+          position: absolute;
+          inset: 0;
+          width: 920px;
+          height: 380px;
+          overflow: visible;
+        }
+        #s03-cluster-label {
+          position: absolute;
+          left: 32px;
+          top: 26px;
+          font-family: var(--mono);
+          font-size: 24px;
+          font-weight: 700;
+          letter-spacing: 0.04em;
+          color: var(--muted);
+        }
+        #s03-dots {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 920px;
+          height: 380px;
+        }
+        #s03-dots .dot {
+          position: absolute;
+          display: block;
+          width: 40px;
+          height: 40px;
+          border-radius: 10px;
+          background: var(--green);
+        }
+        #s03-card {
+          position: absolute;
+          left: 220px;
+          top: 92px;
+          width: 480px;
+          height: 200px;
+          padding: 34px 38px;
+        }
+        #s03-card .name {
+          font-weight: 900;
+          font-size: 64px;
+          letter-spacing: -0.03em;
+          line-height: 1;
+          white-space: nowrap;
+          color: var(--fg);
+        }
+        #s03-card .meta {
+          margin-top: 22px;
+          white-space: nowrap;
+          font-family: var(--mono);
+          font-size: 24px;
+          color: var(--green);
+        }
+        #s03-bottom {
+          position: absolute;
+          left: 80px;
+          right: 80px;
+          bottom: 110px;
+        }
+      </style>
+
+      <div id="s03-root" data-composition-id="s03" data-width="1080" data-height="1080">
+        <div class="stage" id="s03-stage">
+          <div id="s03-top">Keeping GPUs useful is a job.</div>
+          <div id="s03-cluster">
+            <svg viewBox="0 0 920 380">
+              <rect id="s03-outline" x="2" y="2" width="916" height="376" rx="34" fill="none" stroke="#a3ab9f" stroke-width="3" stroke-dasharray="14 12"></rect>
+            </svg>
+            <div id="s03-cluster-label">Kubernetes cluster</div>
+            <div id="s03-dots"></div>
+            <div id="s03-card" class="glass">
+              <div class="name">NVIDIA L4</div>
+              <div class="meta">1 GPU, rented by the hour</div>
+            </div>
+          </div>
+          <div id="s03-bottom" class="statement">I rebuilt it on one rented GPU.</div>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          // A 10 x 4 field of GPUs, laid out from constants (no measuring at seek time).
+          const box = document.getElementById("s03-dots");
+          const dots = [];
+          const cols = 10, rows = 4, size = 40, gapX = 46, gapY = 40;
+          const w = cols * size + (cols - 1) * gapX;
+          const h = rows * size + (rows - 1) * gapY;
+          const x0 = (920 - w) / 2, y0 = (380 - h) / 2;
+          const cx = 460 - size / 2, cy = 195 - size / 2;
+          for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+              const d = document.createElement("div");
+              d.className = "dot";
+              const x = x0 + c * (size + gapX), y = y0 + r * (size + gapY);
+              d.style.left = x + "px";
+              d.style.top = y + "px";
+              d.dataset.dx = String(cx - x);
+              d.dataset.dy = String(cy - y);
+              box.appendChild(d);
+              dots.push(d);
+            }
+          }
+          const tl = gsap.timeline({ paused: true });
+          HF.enter(tl, "#s03-stage", 0);
+          tl.fromTo("#s03-top", { opacity: 0, y: -24 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.15);
+          tl.fromTo(dots, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.5, ease: HF.smooth, stagger: { each: 0.008 } }, 0.1);
+          // The fleet converges to one point: everything collapses toward the card's centre.
+          dots.forEach((d, i) => {
+            tl.fromTo(d, { x: 0, y: 0 }, { x: Number(d.dataset.dx), y: Number(d.dataset.dy), duration: 0.8, ease: HF.smooth }, 1.0 + (i % cols) * 0.012);
+          });
+          tl.to(dots, { opacity: 0, scale: 0.4, duration: 0.35, ease: "power2.in" }, 1.55);
+          // One card materialises where they met.
+          tl.fromTo("#s03-card", { opacity: 0, scale: 0.7, filter: "blur(12px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.7, ease: HF.smooth }, 1.6);
+          // Then the cluster draws itself around it.
+          tl.fromTo("#s03-outline", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: HF.smooth }, 2.1);
+          tl.fromTo("#s03-cluster-label", { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.5, ease: HF.smooth }, 2.25);
+          tl.fromTo("#s03-bottom", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.4);
+          HF.exit(tl, "#s03-stage", 4.6);
+          window.__timelines["s03"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

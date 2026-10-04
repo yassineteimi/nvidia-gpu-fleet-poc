@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        #s02-root {
+          position: absolute;
+          inset: 0;
+        }
+        #s02-label {
+          position: absolute;
+          left: 80px;
+          top: 76px;
+          font-family: var(--mono);
+          font-size: 26px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+          color: var(--muted);
+        }
+        #s02-num {
+          position: absolute;
+          left: 64px;
+          top: 150px;
+          display: block;
+          font-weight: 900;
+          font-size: 360px;
+          line-height: 1;
+          letter-spacing: -0.05em;
+          color: var(--fg);
+          transform-origin: 0% 100%;
+        }
+        #s02-what {
+          position: absolute;
+          left: 80px;
+          right: 80px;
+          top: 545px;
+          font-size: 84px;
+        }
+        #s02-strip {
+          position: absolute;
+          left: 80px;
+          top: 785px;
+          width: 920px;
+          height: 80px;
+          display: flex;
+          gap: 3px;
+        }
+        #s02-strip .day {
+          display: block;
+          flex: 1 1 0;
+          height: 80px;
+          border-radius: 4px;
+          background: #262b26;
+        }
+        #s02-ends {
+          position: absolute;
+          left: 80px;
+          top: 885px;
+          width: 920px;
+          display: flex;
+          justify-content: space-between;
+          font-family: var(--mono);
+          font-size: 24px;
+          color: var(--faint);
+        }
+        #s02-source {
+          color: var(--muted);
+        }
+      </style>
+
+      <div id="s02-root" data-composition-id="s02" data-width="1080" data-height="1080">
+        <div class="stage" id="s02-stage">
+          <div id="s02-label">Training Llama 3</div>
+          <div id="s02-num" class="num">0</div>
+          <div id="s02-what" class="statement">interruptions in 54 days.</div>
+          <div id="s02-strip"></div>
+          <div id="s02-ends"><span>day 1</span><span>day 54</span></div>
+          <div class="source" id="s02-source">16,384 GPUs · Meta, Llama 3 paper</div>
+        </div>
+      </div>
+
+      <script>
+        (function () {
+          const strip = document.getElementById("s02-strip");
+          const days = [];
+          for (let i = 0; i < 54; i++) {
+            const d = document.createElement("div");
+            d.className = "day";
+            strip.appendChild(d);
+            days.push(d);
+          }
+          const tl = gsap.timeline({ paused: true });
+          HF.enter(tl, "#s02-stage", 0);
+          tl.fromTo("#s02-what", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.35);
+          // The count and the calendar run on one clock: day by day, interruption by interruption.
+          HF.count(tl, document.getElementById("s02-num"), 0, 419, 0.45, 2.6, { ease: "power1.inOut" });
+          tl.fromTo("#s02-num", { scale: 0.86 }, { scale: 1, duration: 2.6, ease: "power1.inOut" }, 0.45);
+          tl.fromTo(days, { backgroundColor: "#262b26" }, {
+            backgroundColor: "#ff6f61", duration: 0.2, ease: "none",
+            stagger: { each: 2.6 / 54 },
+          }, 0.45);
+          tl.fromTo("#s02-ends, #s02-source", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: HF.smooth }, 0.6);
+          HF.exit(tl, "#s02-stage", 4.6);
+          window.__timelines["s02"] = tl;
+        })();
+      </script>
+    </template>
+  </body>
+</html>

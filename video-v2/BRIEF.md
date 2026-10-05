@@ -32,8 +32,11 @@ tracking. The story, the scenes and every number stay as in v1.
 
 ## Notes
 
-- Captions only, no voiceover. Music optional later as `assets/music.mp3`; the video
-  must work silent.
+- Narration in Yassine's own HeyGen voice clone, one line per scene
+  (`voice/script.md`), generated on his Mac with `scripts/make-voice.sh`. No
+  subtitles: the on-screen text and graphics carry it. No voice credit on the end
+  card. Total stays 60 s; scene lengths are trued to the recording.
+- Music optional later as `assets/music.mp3`.
 - Faults stay labelled "simulated" or "injected", as on the site.
 - Nothing loaded from the network at render time: GSAP is vendored in
   `assets/vendor/`, fonts are the renderer's bundled Inter and JetBrains Mono.

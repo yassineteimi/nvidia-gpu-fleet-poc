@@ -3,9 +3,10 @@
 The same story as [`../video/`](../video/), rebuilt with
 [HyperFrames](https://hyperframes.heygen.com) (HTML and GSAP, rendered to MP4) instead of
 Remotion. The motion and type follow Apple's design guidance for fluid interfaces.
-1080 x 1080, 30 fps, 60 s, captions only.
+1080 x 1080, 30 fps, 60 s, narrated in my own voice (a HeyGen clone of it), no
+subtitles.
 
-Status: built and checked. Stills of every scene are in `review/`; not yet rendered.
+The rendered video is [`dist/gpu-fleet-poc-v2.mp4`](dist/gpu-fleet-poc-v2.mp4).
 
 | File | What's in it |
 |---|---|
@@ -14,6 +15,8 @@ Status: built and checked. Stills of every scene are in `review/`; not yet rende
 | `STORYBOARD.md` | The 11 scenes, each with its file and the motion rules it uses |
 | `index.html` | The main composition: shared background, motion helpers, scene slots |
 | `compositions/` | One file per scene |
+| `voice/` | The narration: `lines.tsv` (one line per scene), an mp3 and word timings per line |
+| `scripts/make-voice.sh` | Regenerates the narration with HeyGen; needs a HeyGen login |
 | `assets/vendor/gsap.min.js` | GSAP 3.14.2, vendored so nothing loads from the network |
 
 ## What changed from v1
@@ -33,6 +36,10 @@ Status: built and checked. Stills of every scene are in `review/`; not yet rende
   - Scene 10 draws the 19 temperature readings from the burn-in.
 - **"No thermal throttling"** replaces v1's "no throttling". The burn-in ran
   power-capped most of the time, which is throttling by power, not by heat.
+- **Timed to the voice.** Each scene is as long as its spoken line, and its key
+  moment lands on the word that names it: the GPU turns red on "fails", the
+  counter reaches 32 on "32 seconds", the outage slice comes forward on "Most of
+  the outage". The end card takes what's left of the 60 s.
 
 Every number still comes from [`../video/facts.json`](../video/facts.json).
 
@@ -43,6 +50,11 @@ cd video-v2
 npm run check
 npm run render
 ```
+
+Rendering needs `ffmpeg` and `ffprobe` on the PATH. To change a line of narration,
+edit `voice/lines.tsv`, run `VOICE_ID=<id> ./scripts/make-voice.sh <scene id>` on a
+machine signed in to HeyGen, then re-time that scene in `index.html` and its
+composition.
 
 `check` runs HyperFrames' lint, runtime, layout, motion and contrast checks; it should
 pass with 0 errors. Inter and JetBrains Mono are fetched from Google Fonts once at build

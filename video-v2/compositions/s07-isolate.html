@@ -138,18 +138,18 @@
           tl.fromTo(jobs, { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.5, ease: HF.smooth, stagger: 0.08 }, 0.3);
           tl.fromTo(".tagline", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.6);
           // Cordon: the tape snaps across in one quick stroke, and the node's edge turns orange.
-          tl.fromTo("#s07-tape", { scaleX: 0 }, { scaleX: 1, duration: 0.3, ease: HF.smooth }, 1.0);
-          tl.to("#s07-node", { borderColor: "#f6b26b", duration: 0.3 }, 1.0);
-          tl.fromTo("#s07-r1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: HF.smooth }, 1.0);
-          HF.count(tl, document.getElementById("s07-c1"), 0, 0.12, 1.0, 0.4, { decimals: 2 });
+          tl.fromTo("#s07-tape", { scaleX: 0 }, { scaleX: 1, duration: 0.3, ease: HF.smooth }, 2.3);
+          tl.to("#s07-node", { borderColor: "#f6b26b", duration: 0.3 }, 2.3);
+          tl.fromTo("#s07-r1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: HF.smooth }, 2.3);
+          HF.count(tl, document.getElementById("s07-c1"), 0, 0.12, 2.3, 0.4, { decimals: 2 });
           // Drain: workloads leave the node to the right, the first one pushing the rest.
           jobs.slice().reverse().forEach((j, i) => {
-            tl.to(j, { x: 760, opacity: 0, duration: 0.7, ease: "power2.in" }, 1.7 + i * 0.12);
+            tl.to(j, { x: 760, opacity: 0, duration: 0.7, ease: "power2.in" }, 2.7 + i * 0.12);
           });
-          tl.fromTo("#s07-r2", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: HF.smooth }, 1.7);
-          HF.count(tl, document.getElementById("s07-c2"), 0, 2.5, 1.7, 1.0, { decimals: 1 });
-          tl.fromTo("#s07-text", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.9);
-          HF.exit(tl, "#s07-stage", 5.6);
+          tl.fromTo("#s07-r2", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: HF.smooth }, 2.7);
+          HF.count(tl, document.getElementById("s07-c2"), 0, 2.5, 2.7, 1.0, { decimals: 1 });
+          tl.fromTo("#s07-text", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 1.7);
+          HF.exit(tl, "#s07-stage", 4.85);
           window.__timelines["s07"] = tl;
         })();
       </script>

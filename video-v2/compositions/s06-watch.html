@@ -125,13 +125,13 @@
           const tl = gsap.timeline({ paused: true });
           HF.enter(tl, "#s06-stage", 0);
           tl.fromTo("#s06-ends", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: HF.smooth }, 0.15);
-          tl.fromTo("#s06-knob-l", { scale: 0 }, { scale: 1, duration: 0.45, ease: HF.smooth }, 0.35);
+          tl.fromTo("#s06-knob-l", { scale: 0 }, { scale: 1, duration: 0.45, ease: HF.smooth }, 1.3);
           // Time is linear, so the bar and the count are too: 32 seconds, compressed to 2.4.
-          tl.fromTo("#s06-fill", { scaleX: 0 }, { scaleX: 1, duration: 2.4, ease: "none" }, 0.6);
-          HF.count(tl, document.getElementById("s06-count"), 0, 32, 0.6, 2.4, { ease: "none" });
-          tl.fromTo("#s06-knob-r", { scale: 0.6, backgroundColor: "#1c2430" }, { scale: 1, backgroundColor: "#6fa8dc", duration: 0.4, ease: HF.smooth }, 3.0);
+          tl.fromTo("#s06-fill", { scaleX: 0 }, { scaleX: 1, duration: 2.3, ease: "none" }, 1.5);
+          HF.count(tl, document.getElementById("s06-count"), 0, 32, 1.5, 2.3, { ease: "none" });
+          tl.fromTo("#s06-knob-r", { scale: 0.6, backgroundColor: "#1c2430" }, { scale: 1, backgroundColor: "#6fa8dc", duration: 0.4, ease: HF.smooth }, 3.7);
           tl.fromTo("#s06-text", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.5);
-          HF.exit(tl, "#s06-stage", 4.6);
+          HF.exit(tl, "#s06-stage", 4.95);
           window.__timelines["s06"] = tl;
         })();
       </script>

@@ -95,16 +95,16 @@
           }
           const tl = gsap.timeline({ paused: true });
           HF.enter(tl, "#s02-stage", 0);
-          tl.fromTo("#s02-what", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.35);
+          tl.fromTo("#s02-what", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 3.4);
           // The count and the calendar run on one clock: day by day, interruption by interruption.
-          HF.count(tl, document.getElementById("s02-num"), 0, 419, 0.45, 2.6, { ease: "power1.inOut" });
-          tl.fromTo("#s02-num", { scale: 0.86 }, { scale: 1, duration: 2.6, ease: "power1.inOut" }, 0.45);
+          HF.count(tl, document.getElementById("s02-num"), 0, 419, 0.3, 2.3, { ease: "power1.inOut" });
+          tl.fromTo("#s02-num", { scale: 0.86 }, { scale: 1, duration: 2.3, ease: "power1.inOut" }, 0.3);
           tl.fromTo(days, { backgroundColor: "#262b26" }, {
             backgroundColor: "#ff6f61", duration: 0.2, ease: "none",
-            stagger: { each: 2.6 / 54 },
-          }, 0.45);
+            stagger: { each: 2.3 / 54 },
+          }, 0.3);
           tl.fromTo("#s02-ends, #s02-source", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: HF.smooth }, 0.6);
-          HF.exit(tl, "#s02-stage", 4.6);
+          HF.exit(tl, "#s02-stage", 5.35);
           window.__timelines["s02"] = tl;
         })();
       </script>

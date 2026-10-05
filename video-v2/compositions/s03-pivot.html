@@ -138,16 +138,16 @@
           tl.fromTo(dots, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.5, ease: HF.smooth, stagger: { each: 0.008 } }, 0.1);
           // The fleet converges to one point: everything collapses toward the card's centre.
           dots.forEach((d, i) => {
-            tl.fromTo(d, { x: 0, y: 0 }, { x: Number(d.dataset.dx), y: Number(d.dataset.dy), duration: 0.8, ease: HF.smooth }, 1.0 + (i % cols) * 0.012);
+            tl.fromTo(d, { x: 0, y: 0 }, { x: Number(d.dataset.dx), y: Number(d.dataset.dy), duration: 0.8, ease: HF.smooth }, 2.2 + (i % cols) * 0.012);
           });
-          tl.to(dots, { opacity: 0, scale: 0.4, duration: 0.35, ease: "power2.in" }, 1.55);
+          tl.to(dots, { opacity: 0, scale: 0.4, duration: 0.35, ease: "power2.in" }, 2.75);
           // One card materialises where they met.
-          tl.fromTo("#s03-card", { opacity: 0, scale: 0.7, filter: "blur(12px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.7, ease: HF.smooth }, 1.6);
+          tl.fromTo("#s03-card", { opacity: 0, scale: 0.7, filter: "blur(12px)" }, { opacity: 1, scale: 1, filter: "blur(0px)", duration: 0.7, ease: HF.smooth }, 2.8);
           // Then the cluster draws itself around it.
-          tl.fromTo("#s03-outline", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: HF.smooth }, 2.1);
-          tl.fromTo("#s03-cluster-label", { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.5, ease: HF.smooth }, 2.25);
-          tl.fromTo("#s03-bottom", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.4);
-          HF.exit(tl, "#s03-stage", 4.6);
+          tl.fromTo("#s03-outline", { opacity: 0 }, { opacity: 1, duration: 0.5, ease: HF.smooth }, 3.3);
+          tl.fromTo("#s03-cluster-label", { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.5, ease: HF.smooth }, 3.45);
+          tl.fromTo("#s03-bottom", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.9);
+          HF.exit(tl, "#s03-stage", 5.31);
           window.__timelines["s03"] = tl;
         })();
       </script>

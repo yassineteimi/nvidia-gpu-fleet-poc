@@ -192,7 +192,7 @@
           exit: function (tl, target, at) {
             tl.to(
               target,
-              { opacity: 0, scale: 0.97, filter: "blur(10px)", duration: 0.4, ease: "power2.in" },
+              { opacity: 0, scale: 0.97, filter: "blur(10px)", duration: 0.3, ease: "power2.in" },
               at,
             );
           },
@@ -236,17 +236,30 @@
         <div id="grain"></div>
       </div>
 
-      <div id="el-s01" data-composition-id="s01" data-composition-src="compositions/s01-hook.html" data-start="0" data-duration="5" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s02" data-composition-id="s02" data-composition-src="compositions/s02-stakes.html" data-start="5" data-duration="5" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s03" data-composition-id="s03" data-composition-src="compositions/s03-pivot.html" data-start="10" data-duration="5" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s04" data-composition-id="s04" data-composition-src="compositions/s04-loop.html" data-start="15" data-duration="6" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s05" data-composition-id="s05" data-composition-src="compositions/s05-online.html" data-start="21" data-duration="5" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s06" data-composition-id="s06" data-composition-src="compositions/s06-watch.html" data-start="26" data-duration="5" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s07" data-composition-id="s07" data-composition-src="compositions/s07-isolate.html" data-start="31" data-duration="6" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s08" data-composition-id="s08" data-composition-src="compositions/s08-share.html" data-start="37" data-duration="6" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s09" data-composition-id="s09" data-composition-src="compositions/s09-goodput.html" data-start="43" data-duration="8" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s10" data-composition-id="s10" data-composition-src="compositions/s10-burnin.html" data-start="51" data-duration="5" data-track-index="1" data-width="1080" data-height="1080"></div>
-      <div id="el-s11" data-composition-id="s11" data-composition-src="compositions/s11-end.html" data-start="56" data-duration="4" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s01" data-composition-id="s01" data-composition-src="compositions/s01-hook.html" data-start="0" data-duration="3.933" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s02" data-composition-id="s02" data-composition-src="compositions/s02-stakes.html" data-start="3.933" data-duration="5.667" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s03" data-composition-id="s03" data-composition-src="compositions/s03-pivot.html" data-start="9.6" data-duration="5.633" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s04" data-composition-id="s04" data-composition-src="compositions/s04-loop.html" data-start="15.233" data-duration="5" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s05" data-composition-id="s05" data-composition-src="compositions/s05-online.html" data-start="20.233" data-duration="4.233" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s06" data-composition-id="s06" data-composition-src="compositions/s06-watch.html" data-start="24.467" data-duration="5.267" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s07" data-composition-id="s07" data-composition-src="compositions/s07-isolate.html" data-start="29.733" data-duration="5.167" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s08" data-composition-id="s08" data-composition-src="compositions/s08-share.html" data-start="34.9" data-duration="5.267" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s09" data-composition-id="s09" data-composition-src="compositions/s09-goodput.html" data-start="40.167" data-duration="9.2" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s10" data-composition-id="s10" data-composition-src="compositions/s10-burnin.html" data-start="49.367" data-duration="5.267" data-track-index="1" data-width="1080" data-height="1080"></div>
+      <div id="el-s11" data-composition-id="s11" data-composition-src="compositions/s11-end.html" data-start="54.633" data-duration="5.367" data-track-index="1" data-width="1080" data-height="1080"></div>
+
+      <!-- Narration: one line per scene, each starting with its scene. -->
+      <audio id="vo-s01" src="voice/s01.mp3" data-start="0" data-duration="3.918" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s02" src="voice/s02.mp3" data-start="3.933" data-duration="5.642" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s03" src="voice/s03.mp3" data-start="9.6" data-duration="5.616" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s04" src="voice/s04.mp3" data-start="15.233" data-duration="4.989" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s05" src="voice/s05.mp3" data-start="20.233" data-duration="4.232" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s06" src="voice/s06.mp3" data-start="24.467" data-duration="5.251" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s07" src="voice/s07.mp3" data-start="29.733" data-duration="5.146" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s08" src="voice/s08.mp3" data-start="34.9" data-duration="5.251" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s09" src="voice/s09.mp3" data-start="40.167" data-duration="9.169" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s10" src="voice/s10.mp3" data-start="49.367" data-duration="5.251" data-track-index="10" data-volume="1"></audio>
+      <audio id="vo-s11" src="voice/s11.mp3" data-start="54.633" data-duration="4.31" data-track-index="10" data-volume="1"></audio>
     </div>
 
     <script>

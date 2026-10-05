@@ -109,12 +109,12 @@
           const tl = gsap.timeline({ paused: true });
           HF.enter(tl, "#s10-stage", 0);
           tl.fromTo("#s10-card", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.1);
-          tl.fromTo(line, { attr: { "stroke-dashoffset": len } }, { attr: { "stroke-dashoffset": 0 }, duration: 2.4, ease: "power1.inOut" }, 0.45);
-          tl.fromTo(prog, { p: 0 }, { p: 1, duration: 2.4, ease: "power1.inOut", onUpdate: place }, 0.45);
-          tl.fromTo(read, { opacity: 0 }, { opacity: 1, duration: 0.3 }, 0.45);
-          tl.fromTo("#s10-text .statement", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.6);
-          tl.fromTo("#s10-text .second", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.6);
-          HF.exit(tl, "#s10-stage", 4.6);
+          tl.fromTo(line, { attr: { "stroke-dashoffset": len } }, { attr: { "stroke-dashoffset": 0 }, duration: 2.4, ease: "power1.inOut" }, 1.6);
+          tl.fromTo(prog, { p: 0 }, { p: 1, duration: 2.4, ease: "power1.inOut", onUpdate: place }, 1.6);
+          tl.fromTo(read, { opacity: 0 }, { opacity: 1, duration: 0.3 }, 1.6);
+          tl.fromTo("#s10-text .statement", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.4);
+          tl.fromTo("#s10-text .second", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 4.2);
+          HF.exit(tl, "#s10-stage", 4.95);
           window.__timelines["s10"] = tl;
         })();
       </script>

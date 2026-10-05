@@ -66,10 +66,10 @@
           const tl = gsap.timeline({ paused: true });
           HF.enter(tl, "#s11-stage", 0);
           tl.fromTo("#s11-bloom", { opacity: 0, scale: 0.85 }, { opacity: 1, scale: 1, duration: 1.4, ease: HF.smooth }, 0);
-          tl.fromTo("#s11-name", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.7, ease: HF.smooth }, 0.1);
-          tl.fromTo("#s11-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: HF.smooth }, 0.35);
-          tl.fromTo("#s11-line", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.45);
-          tl.fromTo("#s11-url", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.6);
+          tl.fromTo("#s11-name", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.7, ease: HF.smooth }, 0.3);
+          tl.fromTo("#s11-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: HF.smooth }, 0.7);
+          tl.fromTo("#s11-line", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 1.6);
+          tl.fromTo("#s11-url", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.0);
           // Last frame holds: no exit, the URL stays readable to the end.
           window.__timelines["s11"] = tl;
         })();

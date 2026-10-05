@@ -138,17 +138,17 @@
           tl.fromTo("#s05-code", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.1);
           tl.fromTo("#s05-node", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.25);
           // The pinned version types itself in, character by character (a clip reveal, seek-safe).
-          tl.fromTo("#s05-typed", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.9, ease: "steps(11)" }, 0.6);
+          tl.fromTo("#s05-typed", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.8, ease: "steps(11)" }, 0.5);
           // The commit travels to the node.
-          tl.fromTo("#s05-pulse", { attr: { cy: 412 }, opacity: 0 }, { attr: { cy: 468 }, opacity: 1, duration: 0.55, ease: HF.smooth }, 1.6);
-          tl.to("#s05-pulse", { opacity: 0, duration: 0.2 }, 2.16);
+          tl.fromTo("#s05-pulse", { attr: { cy: 412 }, opacity: 0 }, { attr: { cy: 468 }, opacity: 1, duration: 0.45, ease: HF.smooth }, 1.4);
+          tl.to("#s05-pulse", { opacity: 0, duration: 0.2 }, 1.86);
           // The node comes online: chip lights green, state line swaps.
-          tl.to("#s05-chip", { borderColor: "#76b900", backgroundColor: "rgba(118,185,0,0.25)", duration: 0.5, ease: HF.smooth }, 2.15);
-          tl.fromTo("#s05-none", { opacity: 1 }, { opacity: 0, duration: 0.25 }, 2.15);
-          tl.fromTo("#s05-ok", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.45, ease: HF.smooth }, 2.25);
-          tl.fromTo("#s05-text .statement", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.4);
-          tl.fromTo("#s05-text .second", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.65);
-          HF.exit(tl, "#s05-stage", 4.6);
+          tl.to("#s05-chip", { borderColor: "#76b900", backgroundColor: "rgba(118,185,0,0.25)", duration: 0.5, ease: HF.smooth }, 1.85);
+          tl.fromTo("#s05-none", { opacity: 1 }, { opacity: 0, duration: 0.25 }, 1.85);
+          tl.fromTo("#s05-ok", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.45, ease: HF.smooth }, 1.95);
+          tl.fromTo("#s05-text .statement", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 1.9);
+          tl.fromTo("#s05-text .second", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.5);
+          HF.exit(tl, "#s05-stage", 3.91);
           window.__timelines["s05"] = tl;
         })();
       </script>

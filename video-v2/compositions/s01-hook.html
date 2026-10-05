@@ -110,20 +110,20 @@
           }, 0.05);
           // Lockstep: every GPU breathes together, the visual of synchronous training.
           tl.fromTo(cells, { opacity: 1 }, {
-            opacity: 0.55, duration: 0.45, ease: "sine.inOut", yoyo: true, repeat: 1,
-          }, 0.75);
+            opacity: 0.55, duration: 0.35, ease: "sine.inOut", yoyo: true, repeat: 1,
+          }, 0.5);
           // Headline line 1.
-          tl.fromTo("#s01-l1", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.4);
+          tl.fromTo("#s01-l1", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 0.3);
           // The failure: one cell turns red and lifts slightly toward the viewer.
-          tl.to(bad, { backgroundColor: "#ff6f61", scale: 1.18, duration: 0.35, ease: HF.smooth }, 1.75);
+          tl.to(bad, { backgroundColor: "#ff6f61", scale: 1.18, duration: 0.35, ease: HF.smooth }, 1.25);
           // Everything else freezes and greys out, as one beat.
-          tl.to(others, { backgroundColor: "#3a403a", opacity: 1, duration: 0.6, ease: HF.smooth }, 2.15);
-          tl.fromTo("#s01-run", { opacity: 1 }, { opacity: 0, duration: 0.25 }, 2.15);
-          tl.fromTo("#s01-stop", { opacity: 0 }, { opacity: 1, duration: 0.25 }, 2.15);
-          tl.fromTo("#s01-l2", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.3);
-          tl.to("#s01-l1", { color: "#a3ab9f", duration: 0.5, ease: HF.smooth }, 2.3);
+          tl.to(others, { backgroundColor: "#3a403a", opacity: 1, duration: 0.6, ease: HF.smooth }, 2.0);
+          tl.fromTo("#s01-run", { opacity: 1 }, { opacity: 0, duration: 0.25 }, 2.0);
+          tl.fromTo("#s01-stop", { opacity: 0 }, { opacity: 1, duration: 0.25 }, 2.0);
+          tl.fromTo("#s01-l2", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.1);
+          tl.to("#s01-l1", { color: "#a3ab9f", duration: 0.5, ease: HF.smooth }, 2.1);
 
-          HF.exit(tl, "#s01-stage", 4.6);
+          HF.exit(tl, "#s01-stage", 3.61);
           window.__timelines["s01"] = tl;
         })();
       </script>

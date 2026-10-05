@@ -170,20 +170,20 @@
           const tl = gsap.timeline({ paused: true });
           HF.enter(tl, "#s09-stage", 0);
           // The donut draws clockwise, one segment handing off to the next.
-          let at = 0.3;
+          let at = 0.75;
           segs.forEach((s) => {
-            const d = Math.max(0.12, 1.9 * s.frac);
+            const d = Math.max(0.06, 1.9 * s.frac);
             tl.fromTo(s.c, { attr: { "stroke-dasharray": "0 " + C } }, { attr: { "stroke-dasharray": s.len + " " + C }, duration: d, ease: "power1.inOut" }, at);
             at += d;
           });
-          HF.count(tl, document.getElementById("s09-pct"), 0, 66.4, 0.3, 1.9, { decimals: 1 });
-          tl.fromTo("#s09-legend .row", { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.45, ease: HF.smooth, stagger: 0.07 }, 0.6);
-          tl.fromTo("#s09-t1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 1.2);
+          HF.count(tl, document.getElementById("s09-pct"), 0, 66.4, 0.75, 2.1, { decimals: 1 });
+          tl.fromTo("#s09-legend .row", { opacity: 0, x: 20 }, { opacity: 1, x: 0, duration: 0.45, ease: HF.smooth, stagger: 0.07 }, 1.0);
+          tl.fromTo("#s09-t1", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, 2.7);
           tl.set("#s09-t2, #s09-c2", { opacity: 0 }, 0);
 
           // Then the outage: everything else steps back and the red slice comes forward.
           const out = segs[segs.length - 1];
-          const T = 4.3;
+          const T = 5.7;
           segs.slice(0, -1).forEach((s) => tl.to(s.c, { attr: { "stroke-opacity": 0.28 }, duration: 0.5, ease: HF.smooth }, T));
           tl.to(out.g, { x: 26 * Math.cos(out.mid), y: 26 * Math.sin(out.mid), duration: 0.7, ease: HF.smooth }, T);
           Object.keys(rows).forEach((n) => {
@@ -193,7 +193,7 @@
           tl.fromTo("#s09-c2", { opacity: 0, scale: 1.06 }, { opacity: 1, scale: 1, duration: 0.5, ease: HF.smooth }, T + 0.3);
           tl.to("#s09-t1", { opacity: 0, y: -20, duration: 0.3, ease: "power2.in" }, T);
           tl.fromTo("#s09-t2", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: HF.smooth }, T + 0.3);
-          HF.exit(tl, "#s09-stage", 7.6);
+          HF.exit(tl, "#s09-stage", 8.88);
           window.__timelines["s09"] = tl;
         })();
       </script>

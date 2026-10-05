@@ -1,0 +1,68 @@
+[
+  {
+    "id": "w0",
+    "text": "A",
+    "start": 0.299,
+    "end": 0.384
+  },
+  {
+    "id": "w1",
+    "text": "simulated",
+    "start": 0.427,
+    "end": 0.896
+  },
+  {
+    "id": "w2",
+    "text": "GPU",
+    "start": 1.024,
+    "end": 1.408
+  },
+  {
+    "id": "w3",
+    "text": "fault",
+    "start": 1.451,
+    "end": 1.664
+  },
+  {
+    "id": "w4",
+    "text": "reached",
+    "start": 1.835,
+    "end": 2.261
+  },
+  {
+    "id": "w5",
+    "text": "the",
+    "start": 2.432,
+    "end": 2.56
+  },
+  {
+    "id": "w6",
+    "text": "on-call",
+    "start": 2.603,
+    "end": 3.029
+  },
+  {
+    "id": "w7",
+    "text": "alert",
+    "start": 3.072,
+    "end": 3.328
+  },
+  {
+    "id": "w8",
+    "text": "in",
+    "start": 3.541,
+    "end": 3.7547
+  },
+  {
+    "id": "w9",
+    "text": "32",
+    "start": 3.797,
+    "end": 4.437
+  },
+  {
+    "id": "w10",
+    "text": "seconds.",
+    "start": 4.48,
+    "end": 5.009931972789116
+  }
+]

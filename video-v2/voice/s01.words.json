@@ -1,0 +1,56 @@
+[
+  {
+    "id": "w0",
+    "text": "When",
+    "start": 0.299,
+    "end": 0.512
+  },
+  {
+    "id": "w1",
+    "text": "one",
+    "start": 0.597,
+    "end": 0.768
+  },
+  {
+    "id": "w2",
+    "text": "GPU",
+    "start": 0.853,
+    "end": 1.237
+  },
+  {
+    "id": "w3",
+    "text": "fails,",
+    "start": 1.28,
+    "end": 1.749
+  },
+  {
+    "id": "w4",
+    "text": "the",
+    "start": 2.005,
+    "end": 2.176
+  },
+  {
+    "id": "w5",
+    "text": "whole",
+    "start": 2.219,
+    "end": 2.432
+  },
+  {
+    "id": "w6",
+    "text": "training",
+    "start": 2.603,
+    "end": 2.8587
+  },
+  {
+    "id": "w7",
+    "text": "job",
+    "start": 2.987,
+    "end": 3.2
+  },
+  {
+    "id": "w8",
+    "text": "stops.",
+    "start": 3.285,
+    "end": 3.686
+  }
+]

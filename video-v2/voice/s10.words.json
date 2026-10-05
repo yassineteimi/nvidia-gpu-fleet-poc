@@ -1,0 +1,80 @@
+[
+  {
+    "id": "w0",
+    "text": "New",
+    "start": 0.299,
+    "end": 0.469
+  },
+  {
+    "id": "w1",
+    "text": "hardware",
+    "start": 0.555,
+    "end": 0.896
+  },
+  {
+    "id": "w2",
+    "text": "earns",
+    "start": 0.981,
+    "end": 1.1947
+  },
+  {
+    "id": "w3",
+    "text": "its",
+    "start": 1.28,
+    "end": 1.3227
+  },
+  {
+    "id": "w4",
+    "text": "place",
+    "start": 1.451,
+    "end": 1.621
+  },
+  {
+    "id": "w5",
+    "text": "first:",
+    "start": 1.835,
+    "end": 2.304
+  },
+  {
+    "id": "w6",
+    "text": "three",
+    "start": 2.56,
+    "end": 2.816
+  },
+  {
+    "id": "w7",
+    "text": "hours",
+    "start": 2.901,
+    "end": 3.072
+  },
+  {
+    "id": "w8",
+    "text": "at",
+    "start": 3.243,
+    "end": 3.456
+  },
+  {
+    "id": "w9",
+    "text": "full",
+    "start": 3.499,
+    "end": 3.712
+  },
+  {
+    "id": "w10",
+    "text": "load,",
+    "start": 3.797,
+    "end": 4.139
+  },
+  {
+    "id": "w11",
+    "text": "no",
+    "start": 4.352,
+    "end": 4.565
+  },
+  {
+    "id": "w12",
+    "text": "errors.",
+    "start": 4.651,
+    "end": 5.009931972789116
+  }
+]

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "w0",
+    "text": "A",
+    "start": 0.299,
+    "end": 0.4267
+  },
+  {
+    "id": "w1",
+    "text": "GPU",
+    "start": 0.469,
+    "end": 0.981
+  },
+  {
+    "id": "w2",
+    "text": "in",
+    "start": 1.109,
+    "end": 1.365
+  },
+  {
+    "id": "w3",
+    "text": "a",
+    "start": 1.408,
+    "end": 1.4507
+  },
+  {
+    "id": "w4",
+    "text": "fleet",
+    "start": 1.493,
+    "end": 1.792
+  },
+  {
+    "id": "w5",
+    "text": "lives",
+    "start": 2.005,
+    "end": 2.261
+  },
+  {
+    "id": "w6",
+    "text": "in",
+    "start": 2.389,
+    "end": 2.603
+  },
+  {
+    "id": "w7",
+    "text": "a",
+    "start": 2.645,
+    "end": 2.688
+  },
+  {
+    "id": "w8",
+    "text": "loop.",
+    "start": 2.731,
+    "end": 3.221
+  },
+  {
+    "id": "w9",
+    "text": "Here's",
+    "start": 3.541,
+    "end": 3.7547
+  },
+  {
+    "id": "w10",
+    "text": "how",
+    "start": 3.797,
+    "end": 3.925
+  },
+  {
+    "id": "w11",
+    "text": "each",
+    "start": 3.968,
+    "end": 4.053
+  },
+  {
+    "id": "w12",
+    "text": "step",
+    "start": 4.181,
+    "end": 4.309
+  },
+  {
+    "id": "w13",
+    "text": "works.",
+    "start": 4.395,
+    "end": 4.742902494331066
+  }
+]

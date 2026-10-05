@@ -1,0 +1,86 @@
+[
+  {
+    "id": "w0",
+    "text": "One",
+    "start": 0.256,
+    "end": 0.469
+  },
+  {
+    "id": "w1",
+    "text": "commit",
+    "start": 0.555,
+    "end": 0.768
+  },
+  {
+    "id": "w2",
+    "text": "splits",
+    "start": 0.896,
+    "end": 1.109
+  },
+  {
+    "id": "w3",
+    "text": "the",
+    "start": 1.195,
+    "end": 1.28
+  },
+  {
+    "id": "w4",
+    "text": "GPU",
+    "start": 1.323,
+    "end": 1.792
+  },
+  {
+    "id": "w5",
+    "text": "four",
+    "start": 1.877,
+    "end": 2.133
+  },
+  {
+    "id": "w6",
+    "text": "ways,",
+    "start": 2.219,
+    "end": 2.539
+  },
+  {
+    "id": "w7",
+    "text": "and",
+    "start": 2.688,
+    "end": 2.901
+  },
+  {
+    "id": "w8",
+    "text": "every",
+    "start": 2.987,
+    "end": 3.2
+  },
+  {
+    "id": "w9",
+    "text": "team",
+    "start": 3.285,
+    "end": 3.541
+  },
+  {
+    "id": "w10",
+    "text": "stays",
+    "start": 3.755,
+    "end": 4.096
+  },
+  {
+    "id": "w11",
+    "text": "inside",
+    "start": 4.181,
+    "end": 4.2667
+  },
+  {
+    "id": "w12",
+    "text": "its",
+    "start": 4.48,
+    "end": 4.565
+  },
+  {
+    "id": "w13",
+    "text": "quota.",
+    "start": 4.651,
+    "end": 5.05
+  }
+]

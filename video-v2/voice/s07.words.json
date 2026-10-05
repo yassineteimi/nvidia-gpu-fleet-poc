@@ -1,0 +1,74 @@
+[
+  {
+    "id": "w0",
+    "text": "On",
+    "start": 0.299,
+    "end": 0.4267
+  },
+  {
+    "id": "w1",
+    "text": "an",
+    "start": 0.469,
+    "end": 0.5547
+  },
+  {
+    "id": "w2",
+    "text": "injected",
+    "start": 0.597,
+    "end": 0.981
+  },
+  {
+    "id": "w3",
+    "text": "fault,",
+    "start": 1.067,
+    "end": 1.493
+  },
+  {
+    "id": "w4",
+    "text": "a",
+    "start": 1.707,
+    "end": 1.792
+  },
+  {
+    "id": "w5",
+    "text": "controller",
+    "start": 1.835,
+    "end": 2.304
+  },
+  {
+    "id": "w6",
+    "text": "isolated",
+    "start": 2.389,
+    "end": 2.901
+  },
+  {
+    "id": "w7",
+    "text": "the",
+    "start": 3.072,
+    "end": 3.157
+  },
+  {
+    "id": "w8",
+    "text": "node",
+    "start": 3.2,
+    "end": 3.413
+  },
+  {
+    "id": "w9",
+    "text": "in",
+    "start": 3.541,
+    "end": 3.669
+  },
+  {
+    "id": "w10",
+    "text": "2.5",
+    "start": 3.712,
+    "end": 4.309
+  },
+  {
+    "id": "w11",
+    "text": "seconds.",
+    "start": 4.395,
+    "end": 4.987
+  }
+]

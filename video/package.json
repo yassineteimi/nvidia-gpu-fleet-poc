@@ -1,22 +1,11 @@
 {
-  "name": "gpu-fleet-poc-video",
+  "name": "video",
   "private": true,
-  "description": "60 second video about the NVIDIA GPU Fleet PoC, rendered with Remotion",
+  "type": "module",
   "scripts": {
-    "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts GpuFleetPoc out/gpu-fleet-poc-60s.mp4 --codec=h264 --crf=20 --pixel-format=yuv420p --browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell",
-    "poster": "remotion still src/index.ts GpuFleetPoc out/poster.png --frame=1460 --browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell",
-    "finalize": "ffmpeg -y -i out/gpu-fleet-poc-60s.mp4 -vf scale=in_range=full:out_range=tv,format=yuv420p -c:v libx264 -crf 20 -preset slow -movflags +faststart dist/gpu-fleet-poc-60s.mp4 && cp out/poster.png dist/"
-  },
-  "dependencies": {
-    "@fontsource/inter": "5.3.0",
-    "@remotion/cli": "4.0.532",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
-    "remotion": "4.0.532"
-  },
-  "devDependencies": {
-    "@types/react": "19.1.8",
-    "typescript": "5.8.3"
+    "dev": "npx --yes hyperframes@0.8.124 preview",
+    "check": "npx --yes hyperframes@0.8.124 check",
+    "render": "npx --yes hyperframes@0.8.124 render",
+    "publish": "npx --yes hyperframes@0.8.124 publish"
   }
 }

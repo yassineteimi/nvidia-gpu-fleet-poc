@@ -1,52 +1,62 @@
-# The PoC as a 60 second video
+# The 60 second video
 
-A short motion-design video about this project, for hiring managers and a LinkedIn
-audience. Built and rendered: [`dist/gpu-fleet-poc-60s.mp4`](dist/gpu-fleet-poc-60s.mp4)
-(1080 x 1080, 30 fps, 60 s, H.264) and the poster frame
-[`dist/poster.png`](dist/poster.png).
+The project in 60 seconds, for people who don't run GPU clusters: 1080 x 1080, 30 fps,
+narrated in my own voice (a HeyGen clone of it), no subtitles. It's built with
+[HyperFrames](https://hyperframes.heygen.com), which renders HTML and GSAP animation to
+MP4.
 
-**Decided:** made in code with [Remotion](https://www.remotion.dev/) (React), rendered
-to MP4 locally; square 1080 x 1080 at 30 fps, about 60 seconds; captions on screen,
-music optional, no voiceover.
+The rendered video is [`../docs/assets/video/gpu-fleet-poc.mp4`](../docs/assets/video/gpu-fleet-poc.mp4).
 
 | File | What's in it |
 |---|---|
-| `storyboard.md` | The 11 scenes, timing, on-screen text, motion and the look |
-| `facts.json` | Every number the video may show, each with the committed file it comes from |
+| `facts.json` | Every number the video shows, with the committed file it comes from |
+| `BRIEF.md` | What the video is for and the rules it keeps |
+| `frame.md` | The design spec: palette, type, surfaces, motion |
+| `STORYBOARD.md` | The 11 scenes, each with its file and the motion rules it uses |
+| `index.html` | The main composition: shared background, motion helpers, scene slots, narration |
+| `compositions/` | One file per scene |
+| `voice/` | The narration: `lines.tsv` (one line per scene), an mp3 and word timings per line |
+| `scripts/make-voice.sh` | Regenerates the narration with HeyGen; needs a HeyGen login |
+| `assets/vendor/gsap.min.js` | GSAP 3.14.2, vendored so nothing loads from the network |
 
-## Rules for whoever builds it
+## How it's made
 
-- Only numbers from `facts.json`, worded as there. Faults stay labelled "simulated" or
-  "injected"; the site is careful about that and the video must be too.
-- Captions short, in plain English, written for someone who doesn't run GPU clusters.
-  No buzzwords, no exclamation marks.
-- Render locally, with fonts bundled in the project and nothing loaded from the network
-  at render time.
-- The finished files go in `dist/`; `out/` holds build output and stays out of Git.
+- **Only captured numbers.** Every figure on screen or in the narration is in
+  `facts.json`, with its source. Faults are labelled "simulated" or "injected", as
+  on the site.
+- **Real data drawn.**
+  - Scene 5 shows the actual driver pin from `gitops/values/gpu-operator.yaml`.
+  - Scene 9's donut uses the six numbers in `session-d-goodput.json`.
+  - Scene 10 draws the 19 temperature readings from the burn-in.
+- **Timed to the voice.** Each scene is as long as its spoken line, and its key
+  moment lands on the word that names it: the GPU turns red on "fails", the
+  counter reaches 32 on "32 seconds", the outage slice comes forward on "Most of
+  the outage". The end card takes what's left of the 60 s.
+- **Motion.** Entrances use a critically damped spring, so nothing overshoots,
+  except the GPU splitting into four in scene 8, which gets a little bounce. One
+  thing moves at a time, and each scene leaves the way it arrived.
+- **Type.** Statements are set in Inter 900. Anything copied from captured output is
+  set in JetBrains Mono: config lines, units and labels.
 
 ## Rebuilding it
 
 ```sh
 cd video
-npm ci
-npm run render     # writes out/gpu-fleet-poc-60s.mp4
-npm run poster     # writes out/poster.png
-npm run finalize   # re-encodes to yuv420p with faststart into dist/, needs ffmpeg on the PATH
+npm run check
+npx hyperframes render -o renders/gpu-fleet-poc.mp4 --fps 30 --quality delivery
 ```
 
-Each scene is one component in `src/scenes/`, timed in `src/Video.tsx`. Remotion
-needs a Chrome headless shell, not a full Chromium: in Claude's cloud containers that's
-`/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell`, which the
-scripts point at. Elsewhere, drop `--browser-executable` and Remotion downloads its own.
-The render writes `yuvj420p`; `finalize` converts to `yuv420p`, which every player and
-LinkedIn accept.
+Rendering needs `ffmpeg` and `ffprobe` on the PATH, built with the `afade` and
+`alimiter` audio filters. `check` runs HyperFrames' lint, runtime, layout, motion and
+contrast checks; it should pass with 0 errors. Inter and JetBrains Mono are fetched
+from Google Fonts once at build time and cached.
 
-## The prompt this was built from
+The copy in `docs/assets/video/` is re-encoded for the web from the render:
 
-> Read `video/README.md`, `video/storyboard.md` and `video/facts.json` in this
-> repository, and skim `docs/use-cases.md` and `docs/04-goodput-and-burn-in.md` for
-> context. Build the video as a Remotion project in `video/`: one composition,
-> 1080 x 1080, 30 fps, 60 seconds, one React component per storyboard scene. Use only
-> numbers from `facts.json`. Render it to `video/out/gpu-fleet-poc-60s.mp4` with the
-> local Chromium, extract a poster frame, and send me both files. Then send me stills of
-> every scene's middle frame so I can review the text before any polishing.
+```sh
+ffmpeg -i renders/gpu-fleet-poc.mp4 -c:v libx264 -preset slow -crf 20 -pix_fmt yuv420p -c:a copy -movflags +faststart ../docs/assets/video/gpu-fleet-poc.mp4
+```
+
+To change a line of narration, edit `voice/lines.tsv`, run
+`VOICE_ID=<id> ./scripts/make-voice.sh <scene id>` on a machine signed in to HeyGen,
+then re-time that scene in `index.html` and its composition.

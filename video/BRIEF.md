@@ -13,22 +13,21 @@ angle: proof
 
 ## Intent
 
-Version 2 of the 60 second video in `../video/`, rebuilt with HyperFrames instead of
-Remotion, with motion and type following Apple's design guidance: critically damped
+A 60 second video about this project for hiring managers and a LinkedIn feed, made
+with HyperFrames. Motion and type follow Apple's design guidance: critically damped
 springs, one moving thing at a time, translucent layered surfaces, and size-specific
-tracking. The story, the scenes and every number stay as in v1.
+tracking.
 
 ## Assets
 
-- ../video/facts.json: every number the video may show, with its source. The only
-  source of numbers.
-- ../video/storyboard.md: the 11 scenes and their timing, carried over.
+- facts.json: every number the video may show, with its source. The only source of
+  numbers.
 - ../gitops/values/gpu-operator.yaml: the real driver pin shown in scene 5.
 - ../gitops/values/gpu-operator-time-slicing.yaml: the real `replicas: 4` in scene 8.
 
 ## Customizations
 
-- Stills from the middle of every scene go to Yassine before the full render.
+- Stills from the middle of every scene go to Yassine before a full render.
 
 ## Notes
 

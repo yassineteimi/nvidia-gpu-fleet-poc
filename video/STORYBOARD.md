@@ -7,10 +7,9 @@ audience: hiring managers on NVIDIA's Cloud Partner team, and a LinkedIn feed
 mode: collaborative
 ---
 
-The same 11 scenes as `../video/storyboard.md`. Each scene is as long as its narration
-line in `voice/` (the end card takes the remainder of the 60 s), and its key moment
-lands on the word that names it. Numbers come only
-from `../video/facts.json`. Motion names come from `hyperframes-animation`'s rules
+Each scene is as long as its narration line in `voice/` (the end card takes the
+remainder of the 60 s), and its key moment lands on the word that names it. Numbers
+come only from `facts.json`. Motion names come from `hyperframes-animation`'s rules
 index.
 
 ## Frame 1: One GPU fails

@@ -2,7 +2,7 @@
 
 Spoken in Yassine's voice (his HeyGen voice clone), no subtitles. One line per scene;
 `lines.tsv` holds the same text and is what `../scripts/make-voice.sh` reads. Numbers
-match `../../video/facts.json` and what's on screen.
+match `../facts.json` and what's on screen.
 
 | Scene | On screen | Spoken |
 |---|---|---|

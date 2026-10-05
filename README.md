@@ -6,6 +6,11 @@
 </p>
 
 <p align="center">
+  <a href="https://yassineteimi.github.io/nvidia-gpu-fleet-poc/"><img src="docs/assets/video/thumbnail.png" width="480" alt="The project in 60 seconds: play the video"></a><br/>
+  <sub>The project in 60 seconds, with sound</sub>
+</p>
+
+<p align="center">
   <a href="https://yassineteimi.github.io/nvidia-gpu-fleet-poc/"><b>Read the full build and runbook</b></a>
 </p>
 

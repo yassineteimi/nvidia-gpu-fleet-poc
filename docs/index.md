@@ -7,7 +7,11 @@ broken GPU pulled out of service automatically, and the cost of a failure measur
 the second.
 
 New to GPU infrastructure? Start with [the use cases](use-cases.md), which explain
-each piece without assuming you run clusters.
+each piece without assuming you run clusters, or with the 60 second video.
+
+<video controls preload="metadata" playsinline poster="assets/video/thumbnail.png" style="width:100%;max-width:640px;border-radius:12px">
+  <source src="assets/video/gpu-fleet-poc.mp4" type="video/mp4">
+</video>
 
 ## Results
 

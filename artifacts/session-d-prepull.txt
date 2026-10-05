@@ -1,0 +1,5 @@
+prepull started=2026-09-30T19:27:01Z finished=2026-09-30T19:30:33Z phase=Succeeded image=ghcr.io/yassineteimi/goodput-trainer@sha256:20709021478483ea9473a89cd753a737fd1e74fad2e71cb2634bb70f599377fa
+LAST                   REASON      MESSAGE
+2026-09-30T19:27:02Z   Pulling     Pulling image "ghcr.io/yassineteimi/goodput-trainer@sha256:20709021478483ea9473a89cd753a737fd1e74fad2e71cb2634bb70f599377fa"
+2026-09-30T19:30:25Z   Pulled      Successfully pulled image "ghcr.io/yassineteimi/goodput-trainer@sha256:20709021478483ea9473a89cd753a737fd1e74fad2e71cb2634bb70f599377fa" in 3m23.424s (3m23.424s including waiting). Image size: 4276972358 bytes.
+torch 2.11.0+cu128

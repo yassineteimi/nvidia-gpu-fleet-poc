@@ -1,0 +1,1 @@
+PASS  history survives the GPU node: 193 samples, peak 100%, with no GPU node in the cluster

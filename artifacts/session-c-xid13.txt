@@ -1,0 +1,61 @@
+captured_at=2026-09-28T20:24:53Z node=gpu-fleet-gpu-01
+== GPUUnhealthy condition
+status=False reason=NoGPUXidFault lastTransitionTime=2026-09-28T20:19:06Z
+message=no GPU fault XID in the kernel log since node-problem-detector started
+== scheduling
+unschedulable=false
+== controller annotations
+== what the device plugin still advertises
+nvidia.com/gpu capacity=1 allocatable=1
+== node events
+LAST                   TYPE      REASON                    SOURCE                MESSAGE
+2026-09-28T20:20:38Z   Normal    GPUDriverUpgrade          nvidia-gpu-operator   Successfully updated node state label to upgrade-done
+2026-09-28T20:23:05Z   Warning   GPUXid                    gpu-xid-monitor       NVRM: Xid (PCI:0000:01:00): 13, pid=0, name=inject-xid.sh, SIMULATED by scripts/inject-xid.sh, not a real fault
+== pods on the node
+NAMESPACE                NAME                                                   PHASE       OWNER
+gpu-operator             gpu-feature-discovery-7bcdp                            Running     DaemonSet
+gpu-operator             nvidia-container-toolkit-daemonset-27xtk               Running     DaemonSet
+gpu-operator             nvidia-cuda-validator-nksgt                            Succeeded   ClusterPolicy
+gpu-operator             nvidia-dcgm-exporter-xz8n8                             Running     DaemonSet
+gpu-operator             nvidia-dcgm-p6mj5                                      Running     DaemonSet
+gpu-operator             nvidia-device-plugin-daemonset-f2j7k                   Running     DaemonSet
+gpu-operator             nvidia-driver-daemonset-q8fd7                          Running     DaemonSet
+gpu-operator             nvidia-operator-validator-d8kl5                        Running     DaemonSet
+gpu-work                 gpu-workload-79d678ffdf-4h4mq                          Running     ReplicaSet
+kube-flannel             kube-flannel-ds-qrrph                                  Running     DaemonSet
+kube-system              kube-proxy-zvh6t                                       Running     DaemonSet
+kube-system              node-problem-detector-87qmh                            Running     DaemonSet
+monitoring               kube-prometheus-stack-prometheus-node-exporter-wkcls   Running     DaemonSet
+node-feature-discovery   node-feature-discovery-worker-tfgqq                    Running     DaemonSet
+== the workload
+NAME                            READY   STATUS    RESTARTS   AGE     IP            NODE               NOMINATED NODE   READINESS GATES
+gpu-workload-79d678ffdf-4h4mq   1/1     Running   0          2m33s   10.244.2.12   gpu-fleet-gpu-01   <none>           <none>
+== gpu-remediator log, last 20 lines
+2026-09-28 20:00:46,568 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:01:10,260 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:01:10,270 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:01:40,273 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:01:40,282 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:02:10,285 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:02:10,294 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:02:40,297 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:02:40,306 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:03:10,309 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:03:10,319 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:03:40,321 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:03:40,330 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:04:06,743 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:04:10,334 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:04:10,343 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:04:40,345 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:04:40,354 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:05:10,357 INFO gpu-fleet-cp-01: refused
+2026-09-28 20:05:10,366 INFO gpu-fleet-cp-01: refused
+== node-problem-detector on gpu-fleet-gpu-01, GPU lines
+I0928 20:19:06.107511       1 log_monitor.go:80] Finish parsing log monitor config file /config/gpu-monitor.json: {WatcherConfig:{Plugin:kmsg PluginConfig:map[] SkipList:[] LogPath:/dev/kmsg Lookback:5m Delay:} BufferSize:10 Source:gpu-xid-monitor DefaultConditions:[{Type:GPUUnhealthy Status: Transition:0001-01-01 00:00:00 +0000 UTC Reason:NoGPUXidFault Message:no GPU fault XID in the kernel log since node-problem-detector started}] Rules:[{Type:temporary Condition: Reason:GPUXid Pattern:NVRM: Xid \(PCI:[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}[^)]*\): \d+,.* PatternGeneratedMessageSuffix:} {Type:permanent Condition:GPUUnhealthy Reason:GPUXidFault Pattern:NVRM: Xid \(PCI:[0-9a-fA-F]{4}:[0-9a-fA-F]{2}:[0-9a-fA-F]{2}[^)]*\): (?:\d|1[0-24-9]|3[02-9]|4[0-246-9]|6[0-79]|[25789]\d|10[0-8]|1[1-9]\d|[2-9]\d\d|[1-9]\d{3,}),.* PatternGeneratedMessageSuffix:}] EnableMetricsReporting:0x11a91ca5eefc}
+I0928 20:19:06.607375       1 log_monitor.go:237] Initialize condition generated: [{Type:GPUUnhealthy Status:False Transition:2026-09-28 20:19:06.607364561 +0000 UTC m=+2.623034889 Reason:NoGPUXidFault Message:no GPU fault XID in the kernel log since node-problem-detector started}]
+I0928 20:23:05.355007       1 log_monitor.go:161] New status generated: &{Source:gpu-xid-monitor Events:[{Severity:warn Timestamp:2026-09-28 20:23:04.322370516 +0000 UTC m=+240.338040833 Reason:GPUXid Message:NVRM: Xid (PCI:0000:01:00): 13, pid=0, name=inject-xid.sh, SIMULATED by scripts/inject-xid.sh, not a real fault}] Conditions:[{Type:GPUUnhealthy Status:False Transition:2026-09-28 20:19:06.607364561 +0000 UTC m=+2.623034889 Reason:NoGPUXidFault Message:no GPU fault XID in the kernel log since node-problem-detector started}]}
+== timeline so far
+xid_injected=2026-09-28T19:54:04Z node=gpu-fleet-cp-01 xid=79 simulated=true
+returned_to_service=2026-09-28T20:05:32Z node=gpu-fleet-cp-01 gpu_node=false diag_level=2
+xid_injected=2026-09-28T20:23:05.355Z node=gpu-fleet-gpu-01 xid=13 simulated=true

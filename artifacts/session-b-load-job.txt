@@ -1,0 +1,20 @@
+Worker 0:0 [1004]: TensorEngineActive:  generated ???, dcgm 0 (4.94e+04 gflops).
+Worker 0:0 [1004]: TensorEngineActive:  generated ???, dcgm 0 (4.94e+04 gflops).
+Worker 0:0 [1004]: TensorEngineActive:  generated ???, dcgm 0 (4.93e+04 gflops).
+Worker 0:0 [1004]: TensorEngineActive:  generated ???, dcgm 0 (4.93e+04 gflops).
+Worker 0:0[1004]: Message: Set CUDA_VISIBLE_DEVICES to GPU-1e61ad7a-9486-bed3-4cb3-065b17451322
+Bus ID 00000000:01:00.0 mapped to cuda device ID 0
+DCGM CudaContext Init completed successfully.
+
+CU_DEVICE_ATTRIBUTE_MAX_THREADS_PER_MULTIPROCESSOR: 1536
+CUDA_VISIBLE_DEVICES: GPU-1e61ad7a-9486-bed3-4cb3-065b17451322
+CU_DEVICE_ATTRIBUTE_MULTIPROCESSOR_COUNT: 58
+CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_MULTIPROCESSOR: 102400
+CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR: 8
+CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR: 9
+CU_DEVICE_ATTRIBUTE_GLOBAL_MEMORY_BUS_WIDTH: 192
+CU_DEVICE_ATTRIBUTE_MEMORY_CLOCK_RATE: 6251
+Max Memory bandwidth: 300048000000 bytes (300.0 GiB)
+CU_DEVICE_ATTRIBUTE_ECC_SUPPORT: true
+GPU 0, TestField 1004 test PASSED.
+All Tests Passed.

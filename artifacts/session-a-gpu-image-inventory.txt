@@ -1,0 +1,18 @@
+== os
+Ubuntu 24.04.4 LTS - 2026-09-09 - df5effdf
+6.8.0-136-generic
+== binaries
+nvidia-smi   absent
+containerd   absent
+runc         absent
+kubelet      absent
+kubeadm      absent
+kubectl      absent
+docker       absent
+crictl       absent
+== packages
+none of interest
+== units
+none of interest
+== kernel modules
+nouveau              3096576  0

@@ -1,0 +1,26 @@
+{
+  "attempts": [
+    "goodput-6bnnb",
+    "goodput-kjxgc"
+  ],
+  "final_step": 3000,
+  "steps_kept": 3000,
+  "steps_redone": 194,
+  "total_s": 1383.0,
+  "useful_s": 918.182,
+  "redone_s": 58.731,
+  "checkpoint_s": 32.353,
+  "restore_s": 1.755,
+  "outage_s": 360.927,
+  "other_s": 11.051,
+  "goodput": 0.6639,
+  "outages": [
+    {
+      "after": "goodput-6bnnb",
+      "before": "goodput-kjxgc",
+      "last_event_t": 1790797716.006129,
+      "resume_t": 1790798076.932946,
+      "seconds": 360.927
+    }
+  ]
+}

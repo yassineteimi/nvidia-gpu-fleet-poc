@@ -1,0 +1,19 @@
+captured_at=2026-09-30T20:09:51Z run_id=dec0f64e-e8b5-4942-b857-8c7958ec5cdb
+job_start=2026-09-30T19:46:31Z job_completion=2026-09-30T20:09:34Z
+succeeded=1 failed=0
+== Job conditions
+2026-09-30T20:09:34Z SuccessCriteriaMet=True CompletionsReached Reached expected number of succeeded pods
+2026-09-30T20:09:34Z Complete=True CompletionsReached Reached expected number of succeeded pods
+== Job events
+LAST                   REASON                 MESSAGE
+2026-09-30T19:43:57Z   SuccessfulCreate       Created pod: goodput-rng9m
+2026-09-30T19:44:04Z   BackoffLimitExceeded   Job has reached the specified backoff limit
+2026-09-30T19:46:31Z   SuccessfulCreate       Created pod: goodput-6bnnb
+2026-09-30T19:48:46Z   SuccessfulCreate       Created pod: goodput-kjxgc
+2026-09-30T20:09:34Z   Completed              Job completed
+== pods of the Job still in the API
+NAME            READY   STATUS      RESTARTS   AGE   IP            NODE               NOMINATED NODE   READINESS GATES
+goodput-kjxgc   0/1     Completed   0          21m   10.244.4.22   gpu-fleet-gpu-01   <none>           <none>
+== attempts in the bucket
+goodput-6bnnb.jsonl
+goodput-kjxgc.jsonl

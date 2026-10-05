@@ -1,0 +1,9 @@
+xid_injected=2026-09-28T19:54:04Z node=gpu-fleet-cp-01 xid=79 simulated=true
+returned_to_service=2026-09-28T20:05:32Z node=gpu-fleet-cp-01 gpu_node=false diag_level=2
+xid_injected=2026-09-28T20:23:05.355Z node=gpu-fleet-gpu-01 xid=13 simulated=true
+xid_injected=2026-09-28T20:32:46.293Z node=gpu-fleet-gpu-01 xid=79 simulated=true
+diag_level=2 started=2026-09-28T20:40:25Z finished=2026-09-28T20:40:31Z exit=0 node=gpu-fleet-gpu-01
+returned_to_service=2026-09-28T20:40:43Z node=gpu-fleet-gpu-01 gpu_node=true diag_level=2
+diag_level=2 started=2026-09-28T20:43:31Z finished=2026-09-28T20:43:37Z exit=0 node=gpu-fleet-gpu-01
+returned_to_service=2026-09-28T20:43:44Z node=gpu-fleet-gpu-01 gpu_node=true diag_level=2
+xid_injected=2026-09-28T20:49:26.839Z node=gpu-fleet-gpu-01 xid=79 simulated=true

@@ -1,0 +1,5 @@
+PASS  Prometheus scrapes the DCGM exporter
+PASS  every counter in the custom set is being exported
+PASS  GPUUtilisationCollapse went pending, then firing
+INFO  GPUXidCritical fired. If this followed make inject-xid-dcgm, it was SIMULATED
+INFO  DCGM exporter restarts this session: 2

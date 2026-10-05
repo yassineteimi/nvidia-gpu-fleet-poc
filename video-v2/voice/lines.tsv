@@ -2,7 +2,7 @@ s01	When one GPU fails, the whole training job stops.
 s02	Training Llama 3, Meta counted 419 interruptions in 54 days.
 s03	Keeping GPUs useful is a job. I rebuilt it on one rented GPU.
 s04	A GPU in a fleet lives in a loop. Here's how each step works.
-s05	The driver version is pinned in Git. Nobody installs it by hand.
+s05	The driver version is pinned in Git, so nobody installs it by hand.
 s06	A simulated GPU fault reached the on-call alert in 32 seconds.
 s07	On an injected fault, a controller isolated the node in 2.5 seconds.
 s08	One commit splits the GPU four ways, and every team stays inside its quota.
